@@ -129,17 +129,24 @@ session 字段：`id, taskId, todoId, start, end, manual, auto`。
 `mcp/server.py`，stdio 协议，没有端口也没有 systemd 服务，由 Claude Code 的
 `--mcp-config` 拉起。口令自己从 `data/.env` 读，配置文件里不用写密钥。
 
-七个工具，全是薄封装，名字解析和校验都在 HTTP 那边：
+全是薄封装，名字解析和校验都在 HTTP 那边：
 
 | 工具 | 打到 |
 | --- | --- |
 | `get_brief_summary` | `GET /api/summary/brief` |
 | `get_today_summary` | `GET /api/summary/today` |
-| `start_timer` | `POST /api/timer/start` |
-| `pause_timer` | `POST /api/timer/pause` |
 | `stop_timer` | `POST /api/timer/stop` |
 | `create_todo` | `POST /api/todos` |
 | `create_periodic_plan` | `POST /api/plans` |
+| `get_tool_schema` | 本地，取完整说明 |
+
+**没有 start / pause。** 开始和继续计时是 17 自己在页面上按的，AI 不代劳；
+`POST /api/timer/start` 和 `/pause` 接口还在，只是不给 MCP。
+
+**懒加载。** `tools/list` 里只放一行描述和裸参数名，完整说明（什么时候别用、
+字段细节、报错怎么办）放在 `DETAIL` 里，用 `get_tool_schema` 按需取。
+常驻在 system prompt 里的固定开销从 ~830 tokens 压到 ~335。
+加工具时描述保持一行，长的写进 `register()` 第二个参数。
 
 核心数据和权限留在 HTTP + SQLite，MCP 只是 AI 的入口。**不做读-改-写整个 state**，
 要新增写操作就先在 HTTP 补一个细粒度接口，别在 MCP 里拼 state。

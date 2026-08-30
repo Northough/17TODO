@@ -233,6 +233,111 @@ class Store(object):
                 c.execute('ROLLBACK')
                 raise
 
+    # ---------------- 细粒度写入（给 MCP / 脚本用） ----------------
+    # 页面是整体写回 state，脚本要单条插入就得走这里：服务端直接落库并 bump rev，
+    # 页面下次 PUT 会撞 409 然后重新加载，不会互相覆盖。
+
+    def find_task(self, name_or_id):
+        """按 id 或名字找任务。名字支持唯一子串匹配，找不到/有歧义都抛错并列出候选。"""
+        key = (name_or_id or '').strip()
+        if not key:
+            return None
+        with self.lock:
+            rows = self.conn.execute('SELECT id,name FROM tasks').fetchall()
+        for r in rows:
+            if r['id'] == key or r['name'] == key:
+                return r['id']
+        hits = [r for r in rows if key in (r['name'] or '')]
+        if len(hits) == 1:
+            return hits[0]['id']
+        names = '、'.join(r['name'] for r in rows) or '（一个任务都没有）'
+        if len(hits) > 1:
+            raise ValueError('「%s」对上了多个任务：%s' % (key, '、'.join(h['name'] for h in hits)))
+        raise ValueError('没有叫「%s」的任务。现有：%s' % (key, names))
+
+    def find_todo(self, title_or_id):
+        """按 id 或标题找未完成的待办，规则同 find_task。"""
+        key = (title_or_id or '').strip()
+        if not key:
+            return None
+        with self.lock:
+            rows = self.conn.execute('SELECT id,title FROM todos WHERE done=0').fetchall()
+        for r in rows:
+            if r['id'] == key or r['title'] == key:
+                return r['id']
+        hits = [r for r in rows if key in (r['title'] or '')]
+        if len(hits) == 1:
+            return hits[0]['id']
+        if len(hits) > 1:
+            raise ValueError('「%s」对上了多条待办：%s' % (key, '、'.join(h['title'] for h in hits)))
+        raise ValueError('没有未完成的待办叫「%s」。现有：%s'
+                         % (key, '、'.join(r['title'] for r in rows) or '（没有未完成待办）'))
+
+    def add_todo(self, title, task=None, kind='loop', cycle_days=1, due_date=None,
+                 on_expire='reset'):
+        title = (title or '').strip()
+        if not title:
+            raise ValueError('待办内容不能为空')
+        if kind not in ('loop', 'dated', 'open'):
+            raise ValueError('kind 只能是 loop / dated / open')
+        task_id = self.find_task(task) if task else None
+        today = today_key()
+        ts = now_ms()
+        td = {
+            'id': 'k' + os.urandom(3).hex(), 'title': title, 'taskId': task_id, 'kind': kind,
+            'cycleDays': max(1, int(cycle_days or 1)) if kind == 'loop' else 0,
+            'onExpire': on_expire if on_expire in ('reset', 'keep') else 'reset',
+            'cycleStart': None, 'startDate': None, 'startTime': None,
+            'dueDate': None, 'dueTime': None,
+        }
+        if kind == 'loop':
+            td['cycleStart'] = today
+            td['timeBase'] = day_start_ms(today)
+        elif kind == 'dated':
+            due = (due_date or today).strip()
+            if due < today:
+                raise ValueError('截止日 %s 已经过去了' % due)
+            td['startDate'], td['startTime'] = today, '00:00'
+            td['dueDate'], td['dueTime'] = due, '23:59'
+            td['timeBase'] = day_start_ms(today)
+        else:
+            td['timeBase'] = ts
+
+        with self.lock:
+            n = self.conn.execute('SELECT COUNT(*) AS c FROM todos').fetchone()['c']
+            self.conn.execute(
+                'INSERT INTO todos(id,title,task_id,kind,cycle_days,on_expire,cycle_start,'
+                'start_date,start_time,due_date,due_time,time_base,done,done_at,done_at_was,'
+                'missed,plan_id,plan_start,sort_order,created_at,updated_at) '
+                'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,0,NULL,NULL,0,NULL,NULL,?,?,?)',
+                (td['id'], td['title'], td['taskId'], td['kind'], td['cycleDays'], td['onExpire'],
+                 td['cycleStart'], td['startDate'], td['startTime'], td['dueDate'], td['dueTime'],
+                 td['timeBase'], n, ts, ts))
+            rev = self._bump('rev')
+            self.conn.commit()
+        td['rev'] = rev
+        return td
+
+    def add_plan(self, title, task=None, start_date=None, cycle_days=7, due_days=None):
+        title = (title or '').strip()
+        if not title:
+            raise ValueError('待办内容不能为空')
+        task_id = self.find_task(task) if task else None
+        cycle = max(1, int(cycle_days or 7))
+        due = max(1, int(due_days or cycle))
+        start = (start_date or today_key()).strip()
+        ts = now_ms()
+        with self.lock:
+            pid = 'p' + os.urandom(3).hex()
+            self.conn.execute(
+                'INSERT INTO periodic_plans(id,title,task_id,start_date,cycle_days,due_days,'
+                'active,last_created,created_at,updated_at) VALUES(?,?,?,?,?,?,1,NULL,?,?)',
+                (pid, title, task_id, start, cycle, due, ts, ts))
+            rev = self._bump('rev')
+            self.conn.commit()
+        return {'id': pid, 'title': title, 'taskId': task_id, 'startDate': start,
+                'cycleDays': cycle, 'dueDays': due, 'rev': rev}
+
     def setting(self, key, default=None):
         with self.lock:
             row = self.conn.execute('SELECT value_json FROM settings WHERE key=?', (key,)).fetchone()

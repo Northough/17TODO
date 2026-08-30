@@ -201,9 +201,20 @@ class Handler(BaseHTTPRequestHandler):
                 return self._err(400, 'bad json')
             if p == '/api/timer/start':
                 task_id = body.get('taskId')
+                if not task_id and body.get('task'):     # 脚本可以直接给任务名
+                    try:
+                        task_id = STORE.find_task(body['task'])
+                    except ValueError as e:
+                        return self._err(400, str(e))
                 if not task_id:
-                    return self._err(400, 'taskId required')
-                running = STORE.timer_start(task_id, body.get('todoId'), 'todoId' in body)
+                    return self._err(400, 'taskId or task required')
+                todo_id, given = body.get('todoId'), 'todoId' in body
+                if not todo_id and body.get('todo'):
+                    try:
+                        todo_id, given = STORE.find_todo(body['todo']), True
+                    except ValueError as e:
+                        return self._err(400, str(e))
+                running = STORE.timer_start(task_id, todo_id, given)
                 return self._json({'running': running, 'srev': STORE.revs()['srev']})
             if p == '/api/timer/pause':
                 running = STORE.timer_pause()
@@ -216,6 +227,21 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(res)
             if p == '/api/timer/hook':
                 return self._json({'running': STORE.timer_hook(body.get('todoId'))})
+            if p == '/api/todos':
+                try:
+                    return self._json(STORE.add_todo(
+                        body.get('title'), body.get('task'), body.get('kind') or 'loop',
+                        body.get('cycleDays') or 1, body.get('dueDate'),
+                        body.get('onExpire') or 'reset'))
+                except ValueError as e:
+                    return self._err(400, str(e))
+            if p == '/api/plans':
+                try:
+                    return self._json(STORE.add_plan(
+                        body.get('title'), body.get('task'), body.get('startDate'),
+                        body.get('cycleDays') or 7, body.get('dueDays')))
+                except ValueError as e:
+                    return self._err(400, str(e))
             if p == '/api/sessions':
                 return self._add_session(body)
             if p == '/api/sessions/delete':

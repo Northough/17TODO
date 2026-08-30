@@ -103,6 +103,20 @@ Authorization: Bearer <口令>
 session 字段：`id, taskId, todoId, start, end, manual, auto`。
 `auto` 表示后端超时兜底自动结束的，时长多半不实，页面会弹出来让人确认。
 
+## 待办 / 周期计划（单条写入）
+
+页面是整体写回 state，脚本和 MCP 单条插入走这两个。服务端直接落库并推进 `rev`，
+页面下次 PUT 会撞 409 然后重新加载，不会互相覆盖。
+
+- `POST /api/todos` body `{ title, task?, kind?, cycleDays?, dueDate?, onExpire? }`
+  - `kind`：`loop`（默认，配 `cycleDays`）/ `dated`（配 `dueDate`）/ `open`
+  - 返回建好的整条待办 + 新的 `rev`
+- `POST /api/plans` body `{ title, task?, cycleDays?, dueDays?, startDate? }`
+
+`task` 传**任务名**就行，不用查 id：先精确匹配，再唯一子串匹配；
+匹配不到或有歧义会返回 400，报错文案里列出现有任务名。
+`POST /api/timer/start` 的 `task` / `todo` 字段同理。
+
 ## 整库替换
 
 - `POST /api/import` body `{ "state": { tasks, todos, sessions, completions, plans, settings } }`
@@ -110,15 +124,33 @@ session 字段：`id, taskId, todoId, start, end, manual, auto`。
 清空所有表（含 sessions 和正在跑的计时）再写入，返回新的全量快照。
 「导入 JSON」和「清空重来」走这条。**不做增量合并，会覆盖。**
 
-## MCP（还没做）
+## MCP
 
-后续只包装这几个安全接口：
+`mcp/server.py`，stdio 协议，没有端口也没有 systemd 服务，由 Claude Code 的
+`--mcp-config` 拉起。口令自己从 `data/.env` 读，配置文件里不用写密钥。
 
-- `get_brief_summary` → `GET /api/summary/brief`
-- `get_today_summary` → `GET /api/summary/today`
-- `create_todo` / `create_periodic_plan`
-- `start_timer` / `pause_timer` / `stop_timer`
+七个工具，全是薄封装，名字解析和校验都在 HTTP 那边：
 
-核心数据和权限留在 HTTP + SQLite，MCP 只是 AI 的入口。
-写待办目前没有单条接口（页面是整体写回 state），MCP 要写的话得先补
-`POST /api/todos` 这类细粒度接口，否则会和页面的整体写回打架。
+| 工具 | 打到 |
+| --- | --- |
+| `get_brief_summary` | `GET /api/summary/brief` |
+| `get_today_summary` | `GET /api/summary/today` |
+| `start_timer` | `POST /api/timer/start` |
+| `pause_timer` | `POST /api/timer/pause` |
+| `stop_timer` | `POST /api/timer/stop` |
+| `create_todo` | `POST /api/todos` |
+| `create_periodic_plan` | `POST /api/plans` |
+
+核心数据和权限留在 HTTP + SQLite，MCP 只是 AI 的入口。**不做读-改-写整个 state**，
+要新增写操作就先在 HTTP 补一个细粒度接口，别在 MCP 里拼 state。
+
+注册（Nortia 用的是 `/home/admin/.tidal/nortia-mcp.json`）：
+
+```json
+"17todo": {
+  "command": "python3",
+  "args": ["/opt/workspace/17TODO/mcp/server.py"]
+}
+```
+
+换别的 host 或改端口：设 `TODO_URL`；口令不想从 `data/.env` 读就设 `TODO_TOKEN`。

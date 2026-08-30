@@ -1,0 +1,21 @@
+[Unit]
+Description=17TODO 本机后台服务（计时与待办）
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=admin
+WorkingDirectory=/opt/workspace/17TODO/server
+ExecStart=/usr/bin/python3 /opt/workspace/17TODO/server/app.py
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+Environment=TODO_HOST=127.0.0.1
+Environment=TODO_PORT=8310
+Environment=TODO_DB=/opt/workspace/17TODO/data/17todo.db
+# 口令放这里，不进 git。文件不存在服务也能起，只是不认证（仅限本机自用）。
+EnvironmentFile=-/opt/workspace/17TODO/data/.env
+
+[Install]
+WantedBy=multi-user.target

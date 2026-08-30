@@ -138,13 +138,14 @@ session 字段：`id, taskId, todoId, start, end, manual, auto`。
 | `stop_timer` | `POST /api/timer/stop` |
 | `create_todo` | `POST /api/todos` |
 | `create_periodic_plan` | `POST /api/plans` |
-| `get_tool_schema` | 本地，取完整说明 |
+| `get_todo_schema` | 本地，取完整说明 |
 
 **没有 start / pause。** 开始和继续计时是 17 自己在页面上按的，AI 不代劳；
 `POST /api/timer/start` 和 `/pause` 接口还在，只是不给 MCP。
 
 **懒加载。** `tools/list` 里只放一行描述和裸参数名，完整说明（什么时候别用、
-字段细节、报错怎么办）放在 `DETAIL` 里，用 `get_tool_schema` 按需取。
+字段细节、报错怎么办）放在 `DETAIL` 里，用 `get_todo_schema` 按需取。
+（叫 `get_todo_schema` 不叫 `get_tool_schema`，是为了避开 galatea-garden 的同名工具。）
 常驻在 system prompt 里的固定开销从 ~830 tokens 压到 ~335。
 加工具时描述保持一行，长的写进 `register()` 第二个参数。
 

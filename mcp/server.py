@@ -9,7 +9,9 @@
 HTTP 那边做，这里不碰数据结构，更不做读-改-写整个 state。
 
 懒加载：tools/list 里只给一行描述和裸参数名，完整说明（什么时候别用、字段细节、
-报错怎么办）放在 DETAIL 里，Nortia 需要时调 get_tool_schema 取。
+报错怎么办）放在 DETAIL 里，Nortia 需要时调 get_todo_schema 取。
+名字带 todo 是为了跟 galatea-garden 的 get_tool_schema 区分开，光靠命名空间前缀
+容易挑错，两边参数还都叫 name。
 这样常驻在 system prompt 里的固定开销压到最低。
 
 口令默认从 17TODO 的 data/.env 读，所以 nortia-mcp.json 里不用写密钥。
@@ -213,7 +215,7 @@ def _create_plan(args: Dict[str, Any]) -> Any:
 # ---------------- 懒加载入口 ----------------
 
 @register(
-    {'name': 'get_tool_schema', 'description': '取某个 17todo 工具的完整说明。写操作前先查。',
+    {'name': 'get_todo_schema', 'description': '取某个 17todo 工具的完整说明。写操作前先查。',
      'inputSchema': obj(name=STR)},
     '')
 def _schema(args: Dict[str, Any]) -> Any:

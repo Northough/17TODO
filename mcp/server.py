@@ -106,14 +106,21 @@ INT = {'type': 'integer'}
     {'name': 'get_brief_summary', 'description': '17 现在在不在学、学什么、今天多久。很短，可常问。',
      'inputSchema': obj()},
     """
-返回：status / task / todo / today_min / top / due / done
+返回：status / task / todo / today_min / top / due / overdue / plans / done
 
 - `status`：`studying` 正在计时 / `paused` 有任务但暂停 / `relax` 没在学
 - `top`：今天各顶级科目时长 `[[科目, 分钟], ...]`，子任务算到根上
-- `due`：今天到期还没做完的 `[[标题, 截止时间, 已投入分钟], ...]`
+- `due`：**今天到期**还没做完的 `[[标题, 截止时间, 已投入分钟], ...]`
+- `overdue`：**逾期还没结算**的 `[[标题, 逾期几天, 已投入分钟], ...]`，刚逾期的排前面
+- `plans`：周期自定待办 `[[标题, 状态, 已投入分钟], ...]`。状态是
+  `逾期N天` / `今日到期` / `待确认`（新一轮开始了她还没建这条）/ `剩N天` / `已完成`
 - `done`：今天已结算的 `[[标题, 分钟, 状态], ...]`
 
-高频查这个就够。要看细节再用 get_today_summary，别两个都调。
+三段互不重叠：结算过的不进 `overdue`；周期自定待办只在 `plans` 里出现，
+不在 `due` / `overdue` 里再数一遍。（页面上它照样算「今日到期」，那是给她看的，两边不一样是故意的。）
+
+**这是 get_today_summary 的压缩版**，每段只给 3 条，够判断「她在不在学、今天清没清」。
+巡逻高频查这个就行。要更全的名单再用 get_today_summary，别两个都调。
 """)
 def _brief(args: Dict[str, Any]) -> Any:
     return _req('GET', '/api/summary/brief')
@@ -126,7 +133,16 @@ def _brief(args: Dict[str, Any]) -> Any:
 参数：`date` 可选，`YYYY-MM-DD`，不填是今天。
 
 比 get_brief_summary 多的东西：专注次数、已结算条数、逾期条数、
-每条待办的 id 和已投入时长。列表有截断（各 8 条）。
+每条待办的 id 和已投入时长，名单也更长。
+
+三个待办列表分开、互不重叠，各有上限：
+
+- `due_today_unfinished`：今天到期还没做完，8 条
+- `overdue_unfinished`：逾期**且还没结算**的，5 条，带 `overdue_days`，刚逾期的排前面
+- `periodic_plans`：周期自定待办，6 条，带 `state` 和 `due`；`id` 为 null 表示这轮还没建出来
+
+周期自定待办只在 `periodic_plans` 里出现，不在前两段重复。
+计数字段（`overdue_count` 等）也只数各自那一段。
 
 一次问够，别反复刷。
 

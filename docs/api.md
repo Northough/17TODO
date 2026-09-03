@@ -33,11 +33,20 @@ Authorization: Bearer <口令>
   "today_min": 132,
   "top": [["408", 90], ["英语", 42]],
   "due": [["政治马原", "23:59", 35]],
+  "overdue": [["408刷50题", "逾期2天", 0]],
+  "plans": [["本周真题一套", "今日到期", 55]],
   "done": [["背词200", 28, "done"]]
 }
 ```
 
 `status`：`studying` 计时在跑 / `paused` 有任务但暂停 / `relax` 没在计时。
+
+三个待办列表互不重叠：`due` 今天到期、`overdue` 逾期且**还没结算**（刚逾期的排前面）、
+`plans` 周期自定待办。这是 `summary/today` 的压缩版，**每段只给 3 条**。
+
+`plans` 的状态：`逾期N天` / `今日到期` / `待确认`（新一轮开始了但她还没建出这条）/
+`剩N天` / `已完成`。周期自定待办**只**在 `plans` 里出现，不在 `due` / `overdue` 里重复
+——但页面上它照样归进「今日到期」，两边不一致是故意的。
 
 ### `GET /api/summary/today?date=YYYY-MM-DD`
 
@@ -53,10 +62,19 @@ Authorization: Bearer <口令>
     "by_top_task": [{ "task": "408", "minutes": 90 }],
     "settled_count": 3,
     "overdue_count": 1,
-    "due_today_count": 2
+    "due_today_count": 2,
+    "plan_count": 1
   },
   "due_today_unfinished": [
-    { "id": "td1", "title": "政治马原", "task": "政治", "minutes": 35, "due": "23:59", "overdue": false }
+    { "id": "td1", "title": "政治马原", "task": "政治", "minutes": 35, "due": "23:59", "due_day": "2026-08-31" }
+  ],
+  "overdue_unfinished": [
+    { "id": "td3", "title": "408刷50题", "task": "408", "minutes": 0, "due": "23:59",
+      "due_day": "2026-08-29", "overdue_days": 2 }
+  ],
+  "periodic_plans": [
+    { "id": "td4", "title": "本周真题一套", "task": "408", "every_days": 7,
+      "minutes": 55, "due": "2026-08-31", "state": "今日到期" }
   ],
   "completed_today": [
     { "id": "td2", "title": "背词200", "task": "英语", "minutes": 28, "status": "done" }
@@ -65,6 +83,16 @@ Authorization: Bearer <口令>
 ```
 
 `by_top_task` 按顶级任务聚合，子任务的时间算到根上。
+
+三个待办列表的分法和 brief 一样（互不重叠），但名单更长：
+
+| 字段 | 装什么 | 上限 |
+| --- | --- | --- |
+| `due_today_unfinished` | 今天到期、还没逾期、还没做完 | 8 |
+| `overdue_unfinished` | 逾期**且还没结算**的，带 `overdue_days`，刚逾期的排前面 | 5 |
+| `periodic_plans` | 周期自定待办，带 `state` / `due`，`id` 为 null 表示这轮还没建出来 | 6 |
+
+计数字段（`overdue_count` / `due_today_count` / `plan_count`）只数各自那一段。
 
 ## 计时
 
@@ -96,12 +124,23 @@ Authorization: Bearer <口令>
 
 - `GET /api/sessions` → `{ sessions, srev }`
 - `POST /api/sessions` body `{ taskId, todoId, start, end }` → 手动补记，标 `manual`
+- `PUT /api/sessions/:id` body `{ taskId, todoId, start, end }` → 改一段已有记录，改完也算 `manual`
 - `DELETE /api/sessions/:id`
-- `POST /api/sessions/delete` body `{ ids: [...] }` → 删任务时连带清理
+- `POST /api/sessions/delete` body `{ ids: [...] }` → 按 id 批量删
+- `POST /api/sessions/orphan` body `{ tasks: [{id, name}, ...] }` → 删任务时用，见下
 - `POST /api/sessions/unhook` body `{ todoId }` → 待办删了，记录留着只解挂钩
 
-session 字段：`id, taskId, todoId, start, end, manual, auto`。
+session 字段：`id, taskId, todoId, start, end, manual, auto`，外加可空的 `taskName`。
 `auto` 表示后端超时兜底自动结束的，时长多半不实，页面会弹出来让人确认。
+
+### 任务删了，记录不删
+
+删任务走 `orphan`，不是 `delete`：`task_id` 置空，任务名存进 `task_name`，
+统计里按这个名字单独成一组显示（灰色，标「已删除」）。
+
+之后只要建出一个**同名**任务，`PUT /api/state` 会在写完 tasks 后自动把这些记录认领回去
+（`task_id` 指向新任务、`task_name` 清空），从此再改任务名统计跟着走。
+认领发生时会 bump `srev`，页面下次 sync 就能拿到。
 
 ## 待办 / 周期计划（单条写入）
 

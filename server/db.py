@@ -90,7 +90,42 @@ class Store(object):
             sql = f.read()
         with self.lock:
             self.conn.executescript(sql)
+            self._migrate()
             self.conn.commit()
+
+    def _migrate(self):
+        """给老库补上 schema.sql 后来改的东西。
+
+        CREATE TABLE IF NOT EXISTS 碰到已存在的表什么都不做，所以加字段、
+        松约束都得在这儿自己来一遍。全部可重复执行。
+        """
+        info = list(self.conn.execute('PRAGMA table_info(sessions)'))
+        if not any(r['name'] == 'task_name' for r in info):
+            self.conn.execute('ALTER TABLE sessions ADD COLUMN task_name TEXT')
+            info = list(self.conn.execute('PRAGMA table_info(sessions)'))
+        # 老库 task_id 是 NOT NULL，删任务时没法把它置空。SQLite 改不了约束，整表重建。
+        if any(r['name'] == 'task_id' and r['notnull'] for r in info):
+            self.conn.executescript("""
+                CREATE TABLE sessions_new (
+                  id TEXT PRIMARY KEY,
+                  task_id TEXT,
+                  todo_id TEXT,
+                  start_ts INTEGER NOT NULL,
+                  end_ts INTEGER NOT NULL,
+                  manual INTEGER NOT NULL DEFAULT 0,
+                  auto INTEGER NOT NULL DEFAULT 0,
+                  task_name TEXT,
+                  created_at INTEGER NOT NULL
+                );
+                INSERT INTO sessions_new
+                  SELECT id,task_id,todo_id,start_ts,end_ts,manual,auto,task_name,created_at
+                  FROM sessions;
+                DROP TABLE sessions;
+                ALTER TABLE sessions_new RENAME TO sessions;
+                CREATE INDEX IF NOT EXISTS idx_sessions_start ON sessions(start_ts);
+                CREATE INDEX IF NOT EXISTS idx_sessions_task ON sessions(task_id);
+                CREATE INDEX IF NOT EXISTS idx_sessions_todo ON sessions(todo_id);
+            """)
 
     # ---------------- meta ----------------
 
@@ -226,12 +261,28 @@ class Store(object):
                     c.execute('INSERT INTO settings(key,value_json,updated_at) VALUES(?,?,?)',
                               (k, _j(v), ts))
 
+                if self._claim_orphans(c):
+                    self._bump('srev')      # 认领改了 sessions，页面得知道要重拉
                 rev = self._bump('rev')
                 c.execute('COMMIT')
                 return rev
             except Exception:
                 c.execute('ROLLBACK')
                 raise
+
+    def _claim_orphans(self, c):
+        """孤儿记录找同名任务认领。任务表刚写完就跑一遍，所以新建 / 改名都能接上。
+
+        认领之后 task_id 指向真任务、快照清掉，之后再改任务名统计跟着走。
+        重名任务取第一个，反正页面上也分不出来。
+        """
+        cur = c.execute(
+            'UPDATE sessions SET '
+            '  task_id=(SELECT id FROM tasks WHERE tasks.name=sessions.task_name LIMIT 1),'
+            '  task_name=NULL '
+            'WHERE task_id IS NULL AND task_name IS NOT NULL '
+            '  AND EXISTS(SELECT 1 FROM tasks WHERE tasks.name=sessions.task_name)')
+        return cur.rowcount or 0
 
     # ---------------- 细粒度写入（给 MCP / 脚本用） ----------------
     # 页面是整体写回 state，脚本要单条插入就得走这里：服务端直接落库并 bump rev，
@@ -350,11 +401,17 @@ class Store(object):
 
     def load_sessions(self):
         with self.lock:
-            return [{
-                'id': r['id'], 'taskId': r['task_id'], 'todoId': r['todo_id'],
-                'start': r['start_ts'], 'end': r['end_ts'],
-                'manual': bool(r['manual']), 'auto': bool(r['auto']),
-            } for r in self.conn.execute('SELECT * FROM sessions ORDER BY start_ts')]
+            out = []
+            for r in self.conn.execute('SELECT * FROM sessions ORDER BY start_ts'):
+                s = {
+                    'id': r['id'], 'taskId': r['task_id'], 'todoId': r['todo_id'],
+                    'start': r['start_ts'], 'end': r['end_ts'],
+                    'manual': bool(r['manual']), 'auto': bool(r['auto']),
+                }
+                if r['task_id'] is None and r['task_name']:
+                    s['taskName'] = r['task_name']      # 任务已删，只剩名字
+                out.append(s)
+            return out
 
     def add_session(self, sid, task_id, todo_id, start, end, manual=False, auto=False):
         with self.lock:
@@ -362,6 +419,20 @@ class Store(object):
                 'INSERT INTO sessions(id,task_id,todo_id,start_ts,end_ts,manual,auto,created_at) '
                 'VALUES(?,?,?,?,?,?,?,?)',
                 (sid, task_id, todo_id, int(start), int(end), _b(manual), _b(auto), now_ms()))
+            srev = self._bump('srev')
+            self.conn.commit()
+            return srev
+
+    def update_session(self, sid, task_id, todo_id, start, end):
+        """改一段已有记录的任务 / 挂钩 / 起止时间。改过就算手动记录。"""
+        with self.lock:
+            row = self.conn.execute('SELECT id FROM sessions WHERE id=?', (sid,)).fetchone()
+            if not row:
+                raise KeyError(sid)
+            self.conn.execute(
+                'UPDATE sessions SET task_id=?,todo_id=?,start_ts=?,end_ts=?,'
+                'manual=1,auto=0,task_name=NULL WHERE id=?',
+                (task_id, todo_id, int(start), int(end), sid))
             srev = self._bump('srev')
             self.conn.commit()
             return srev
@@ -374,11 +445,29 @@ class Store(object):
             return srev
 
     def delete_sessions(self, ids):
-        """删任务时连带清掉它名下的专注记录。"""
+        """按 id 批量删记录。删任务不再走这里，用 orphan_sessions。"""
         if not ids:
             return self._meta('srev')
         with self.lock:
             self.conn.executemany('DELETE FROM sessions WHERE id=?', [(i,) for i in ids])
+            srev = self._bump('srev')
+            self.conn.commit()
+            return srev
+
+    def orphan_sessions(self, tasks):
+        """任务删了，专注记录留着：task_id 置空，把任务名存成快照。
+
+        统计从此按这个名字单独成组显示。之后建了同名任务，save_state 里的
+        _claim_orphans 会把它们认领回去，再改名就跟着新任务走了。
+
+        tasks: [{'id': ..., 'name': ...}, ...]
+        """
+        rows = [(t.get('name') or '（已删除）', t.get('id')) for t in (tasks or []) if t.get('id')]
+        if not rows:
+            return self._meta('srev')
+        with self.lock:
+            self.conn.executemany(
+                'UPDATE sessions SET task_id=NULL, task_name=? WHERE task_id=?', rows)
             srev = self._bump('srev')
             self.conn.commit()
             return srev
@@ -402,9 +491,10 @@ class Store(object):
             for s in state.get('sessions') or []:
                 self.conn.execute(
                     'INSERT OR REPLACE INTO sessions(id,task_id,todo_id,start_ts,end_ts,manual,auto,'
-                    'created_at) VALUES(?,?,?,?,?,?,?,?)',
+                    'task_name,created_at) VALUES(?,?,?,?,?,?,?,?,?)',
                     (s['id'], s.get('taskId'), s.get('todoId'), int(s.get('start') or 0),
-                     int(s.get('end') or 0), _b(s.get('manual')), _b(s.get('auto')), ts))
+                     int(s.get('end') or 0), _b(s.get('manual')), _b(s.get('auto')),
+                     s.get('taskName'), ts))
             self._bump('srev')
             self.conn.commit()
             return rev
@@ -571,6 +661,53 @@ class Store(object):
         a = day_start_ms(d)
         return d, a, a + DAY_MS
 
+    # ---- 周期自定待办：模板本身不是待办，每轮起点提醒她建一条有期限的出来 ----
+
+    def _plan_cycle_start(self, p):
+        start = p['start_date'] or today_key()
+        cycle = max(1, int(p['cycle_days'] or 7))
+        passed = max(0, diff_days(start, today_key()))
+        return add_days(start, (passed // cycle) * cycle)
+
+    def _plan_due_date(self, p, start):
+        return add_days(start, max(1, int(p['due_days'] or p['cycle_days'] or 1)) - 1)
+
+    def _plan_rows(self, tm, todos):
+        """每个在用的周期模板当前是什么状态。
+
+        本轮已经建出待办就报那条的真实进度，还没建就是「待确认」。
+        排序：逾期 → 今日到期 → 待确认 → 还有几天 → 已完成。
+        """
+        d = today_key()
+        out = []
+        for p in self.conn.execute('SELECT * FROM periodic_plans WHERE active=1'):
+            start = self._plan_cycle_start(p)
+            td = next((r for r in todos
+                       if r['plan_id'] == p['id'] and r['plan_start'] == start), None)
+            row = {'title': p['title'], 'task': tm.get(p['task_id'], {}).get('name'),
+                   'every_days': max(1, int(p['cycle_days'] or 7)), 'minutes': 0, 'id': None}
+            if td is None:
+                row['due'] = self._plan_due_date(p, start)
+                row['state'] = '待确认'
+                rank = (2, diff_days(d, row['due']))
+            else:
+                row['id'] = td['id']
+                row['minutes'] = self._todo_minutes(td)
+                row['due'] = self._todo_due_day(td) or self._plan_due_date(p, start)
+                if td['done']:
+                    row['state'], rank = '已完成', (4, 0)
+                elif self._todo_overdue(td):
+                    n = max(1, diff_days(row['due'], d))
+                    row['state'], rank = '逾期%d天' % n, (0, -n)
+                elif row['due'] == d:
+                    row['state'], rank = '今日到期', (1, 0)
+                else:
+                    left = diff_days(d, row['due'])
+                    row['state'], rank = '剩%d天' % left, (3, left)
+            out.append((rank, row))
+        out.sort(key=lambda x: x[0])
+        return [r for _, r in out]
+
     def summary_today(self, day=None):
         with self.lock:
             d, a, b = self._day_window(day)
@@ -589,25 +726,30 @@ class Store(object):
                     by_top[top] = by_top.get(top, 0) + ms
 
             todos = self.conn.execute('SELECT * FROM todos').fetchall()
+            plan_rows = self._plan_rows(tm, todos)
+            # 周期自定待办只在 plans 段露面，不在 due / overdue 里重复一遍
+            in_plan = set(r['id'] for r in todos if r['plan_id'])
+
             due_today = []
-            overdue_n = 0
-            due_today_n = 0
+            overdue = []
             for r in todos:
-                od = self._todo_overdue(r)
-                if od:
-                    overdue_n += 1
+                if r['done'] or r['id'] in in_plan:
+                    continue
                 dd = self._todo_due_day(r)
-                if dd == d and not r['done']:
-                    due_today_n += 1
-                if (od or dd == d) and not r['done']:
-                    due_today.append({
-                        'id': r['id'], 'title': r['title'],
-                        'task': tm.get(r['task_id'], {}).get('name'),
-                        'minutes': self._todo_minutes(r),
-                        'due': (r['due_time'] or '23:59') if r['kind'] == 'dated' else '23:59',
-                        'overdue': od,
-                    })
-            due_today.sort(key=lambda x: (not x['overdue'], x['due']))
+                item = {
+                    'id': r['id'], 'title': r['title'],
+                    'task': tm.get(r['task_id'], {}).get('name'),
+                    'minutes': self._todo_minutes(r),
+                    'due': (r['due_time'] or '23:59') if r['kind'] == 'dated' else '23:59',
+                    'due_day': dd,
+                }
+                if self._todo_overdue(r):
+                    item['overdue_days'] = max(1, diff_days(dd, d)) if dd else 1
+                    overdue.append(item)
+                elif dd == d:
+                    due_today.append(item)
+            due_today.sort(key=lambda x: x['due'])
+            overdue.sort(key=lambda x: x['overdue_days'])       # 刚逾期的排前面
 
             comps = self.conn.execute(
                 'SELECT * FROM settlements WHERE day=? ORDER BY at_ts DESC', (d,)).fetchall()
@@ -644,14 +786,18 @@ class Store(object):
                     'by_top_task': [{'task': tm[k]['name'], 'minutes': int(round(v / 60000.0))}
                                     for k, v in top_list],
                     'settled_count': len(comps),
-                    'overdue_count': overdue_n,
-                    'due_today_count': due_today_n,
+                    'overdue_count': len(overdue),
+                    'due_today_count': len(due_today),
+                    'plan_count': len(plan_rows),
                 },
                 'due_today_unfinished': due_today[:8],
+                'overdue_unfinished': overdue[:5],
+                'periodic_plans': plan_rows[:6],
                 'completed_today': completed[:8],
             }
 
     def summary_brief(self):
+        """summary_today 的压缩版：同样三段，每段只留 3 条。巡逻高频调这个。"""
         t = self.summary_today()
         return {
             'status': t['status']['mode'],
@@ -660,6 +806,9 @@ class Store(object):
             'today_min': t['today']['focus_minutes'],
             'top': [[x['task'], x['minutes']] for x in t['today']['by_top_task'][:3]],
             'due': [[x['title'], x['due'], x['minutes']] for x in t['due_today_unfinished'][:3]],
+            'overdue': [[x['title'], '逾期%d天' % x['overdue_days'], x['minutes']]
+                        for x in t['overdue_unfinished'][:3]],
+            'plans': [[x['title'], x['state'], x['minutes']] for x in t['periodic_plans'][:3]],
             'done': [[x['title'], x['minutes'], x['status']] for x in t['completed_today'][:3]],
         }
 

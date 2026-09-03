@@ -247,6 +247,9 @@ class Handler(BaseHTTPRequestHandler):
             if p == '/api/sessions/delete':
                 srev = STORE.delete_sessions(body.get('ids') or [])
                 return self._json({'srev': srev, 'sessions': STORE.load_sessions()})
+            if p == '/api/sessions/orphan':
+                srev = STORE.orphan_sessions(body.get('tasks') or [])
+                return self._json({'srev': srev, 'sessions': STORE.load_sessions()})
             if p == '/api/sessions/unhook':
                 if not body.get('todoId'):
                     return self._err(400, 'todoId required')
@@ -276,6 +279,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._err(400, 'bad json')
             if p == '/api/state':
                 return self._put_state(body)
+            if p.startswith('/api/sessions/'):
+                return self._edit_session(p[len('/api/sessions/'):], body)
             return self._err(404, 'not found')
         except Exception as e:
             log('PUT %s failed: %r' % (p, e))
@@ -344,6 +349,21 @@ class Handler(BaseHTTPRequestHandler):
             return self._err(400, 'end must be after start')
         sid = body.get('id') or ('m%s' % format(dbm.now_ms(), 'x')[-8:])
         srev = STORE.add_session(sid, task_id, body.get('todoId'), int(start), int(end), manual=True)
+        return self._json({'srev': srev, 'sessions': STORE.load_sessions()})
+
+    def _edit_session(self, sid, body):
+        if not sid:
+            return self._err(400, 'id required')
+        task_id = body.get('taskId')
+        start, end = body.get('start'), body.get('end')
+        if not task_id or not start or not end:
+            return self._err(400, 'taskId/start/end required')
+        if int(end) <= int(start):
+            return self._err(400, 'end must be after start')
+        try:
+            srev = STORE.update_session(sid, task_id, body.get('todoId'), int(start), int(end))
+        except KeyError:
+            return self._err(404, '没有这条专注记录：%s' % sid)
         return self._json({'srev': srev, 'sessions': STORE.load_sessions()})
 
 

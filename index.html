@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>专注 · 计时与待办</title>
+<!-- 白底橙字 ToDo，内嵌不走网络 -->
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTMiIGZpbGw9IiNGRkZGRkYiLz48dGV4dCB4PSIzMiIgeT0iNDEiIHRleHQtYW5jaG9yPSJtaWRkbGUiIHRleHRMZW5ndGg9IjUyIiBsZW5ndGhBZGp1c3Q9InNwYWNpbmdBbmRHbHlwaHMiIGZvbnQtZmFtaWx5PSJHZW9yZ2lhLFRpbWVzIE5ldyBSb21hbixzZXJpZiIgZm9udC1zaXplPSIyNiIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI0UwNTYyRiI+VG9EbzwvdGV4dD48L3N2Zz4=">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
@@ -20,15 +22,20 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+body.modal-open{overflow:hidden}
 button,input,select,textarea{font:inherit;color:inherit}
 button{background:none;border:none;cursor:pointer}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
 ::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:#D2CCC4;border-radius:4px}
 
 .wrap{max-width:880px;margin:0 auto;padding:0 14px 118px}
-.wrap.focus-grid{max-width:1510px;display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:18px;padding-top:14px}
+/* 计时页两栏各自独立滚动：左边任务、右边待办互不带动，滚到底也不传给整页 */
+.wrap.focus-grid{max-width:1510px;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;
+  height:calc(100vh - 57px);padding:14px 14px 0;overflow:hidden}
 .focus-main{min-width:0}.focus-main .dialcard{margin-top:0}
-.focus-side{min-width:0;position:sticky;top:70px;align-self:start;max-height:calc(100vh - 142px);overflow:auto;border-left:1px solid var(--line);padding-left:4px}
+.focus-grid .focus-main,.focus-grid .focus-side{overflow-y:auto;overscroll-behavior:contain;padding-bottom:84px}
+.focus-grid .focus-main{padding-right:6px}
+.focus-side{min-width:0;border-left:1px solid var(--line);padding-left:4px}
 .side-title{display:flex;align-items:center;gap:8px;padding:0 4px 9px;color:var(--dim);font-size:12px;font-weight:600}
 .side-title .grow{flex:1}
 .topbar{position:sticky;top:0;z-index:20;background:#EDEBE7F2;backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
@@ -58,6 +65,10 @@ button{background:none;border:none;cursor:pointer}
 .dinfo .p{font-size:11.5px;color:var(--faint)}
 .dinfo .n{font-size:19px;font-weight:600}
 .dinfo .n.idle{font-size:15px;font-weight:400;color:var(--faint)}
+.focus-count{min-width:170px;max-width:270px;align-self:stretch;display:flex;flex-direction:column;align-items:flex-end;justify-content:center;text-align:right;padding-left:14px;padding-right:8px;box-sizing:border-box}
+.focus-count b{font-family:Georgia,"Times New Roman",serif;font-size:42px;font-weight:700;font-style:italic;line-height:.95;color:var(--count-text,#2F7D9D);font-variant-numeric:tabular-nums}
+.focus-count b .num{color:var(--count-num,#E0562F);text-shadow:0 10px 24px color-mix(in srgb,var(--count-num,#E0562F) 28%,transparent)}
+.focus-count b .word{color:var(--count-text,#2F7D9D)}
 .hook{display:inline-flex;align-items:center;gap:6px;border:1px dashed var(--line);border-radius:8px;padding:5px 10px;font-size:12.5px;color:var(--dim);align-self:flex-start;max-width:100%}
 .hook.on{border-style:solid;border-color:var(--acc);color:var(--acc);background:var(--acc-s)}
 .hook span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -88,7 +99,7 @@ button{background:none;border:none;cursor:pointer}
 .ringlet text{font-size:9px;fill:var(--ban-ink);font-family:var(--mono)}
 .bgo{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:2px;padding-right:8px}
 .bgo button{font-size:15px;font-weight:600;color:var(--ban-ink);padding:6px 8px}
-.bgo small{font-size:10.5px;color:#2F2C2A94}
+.bcount{flex:none;font-size:10.5px;color:#2F2C2A94;white-space:nowrap}
 .bmore{width:26px;height:26px;flex:none;display:grid;place-items:center;color:#2F2C2A82;border-radius:7px}
 .bmore:hover{background:#FBFAF773;color:var(--ban-ink)}
 .ban.live{box-shadow:0 0 0 2px var(--acc),0 2px 10px #6E7F7738}
@@ -126,7 +137,11 @@ button{background:none;border:none;cursor:pointer}
 .tdact button:hover{background:var(--card);color:var(--ink)}
 
 /* ---------- 统计 ---------- */
-.nav{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:9px 12px;margin-bottom:11px}
+/* 左右按钮各占一等份，日期永远落在正中间 */
+.nav{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:9px 12px;margin-bottom:11px}
+.nav-side{display:flex;align-items:center;gap:6px}
+.nav-side.end{justify-content:flex-end}
+.nav-day{text-align:center;white-space:nowrap}
 .nav b{font-family:var(--mono);font-size:14px;font-weight:500}
 .nav .d{font-size:11.5px;color:var(--faint)}
 .nav button{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;color:var(--dim)}
@@ -141,9 +156,23 @@ button{background:none;border:none;cursor:pointer}
 .stat3 .v{font-family:var(--mono);font-size:21px;font-weight:400}
 .stat3 .v i{font-style:normal;font-size:11px;color:var(--faint);margin:0 1px 0 2px}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px;margin-bottom:11px}
-.panel>h3{font-size:12px;font-weight:600;color:var(--dim);margin-bottom:12px;letter-spacing:.03em}
+.panel h3{font-size:12px;font-weight:600;color:var(--dim);margin-bottom:12px;letter-spacing:.03em}
+.panel h3.mid{text-align:center}
+.ph{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.ph h3{flex:1;min-width:0;margin-bottom:0}
+.ph .ib{width:28px;height:28px;border-radius:8px;font-size:16px;line-height:1}
+/* 饼图自己的两条控制栏：上面选日子，下面选看第几层 */
+.pie-ctl{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:7px;margin-bottom:9px;font-size:12px;color:var(--faint)}
+.pie-ctl button{border:1px solid var(--line);background:var(--card);border-radius:7px;padding:4px 10px;font-size:12px;color:var(--dim)}
+.pie-ctl button:hover:not(:disabled){border-color:#D3CDC5;color:var(--ink)}
+.pie-ctl button:disabled{opacity:.3}
+.pie-ctl button[aria-pressed=true]{background:var(--acc);color:#fff;border-color:var(--acc)}
+.pie-ctl input[type=date]{border:1px solid var(--line);background:var(--soft);border-radius:7px;padding:4px 8px;font-family:var(--mono);font-size:11.5px;color:var(--ink)}
+.pie-ctl .lv{font-family:var(--mono);font-size:12px;color:var(--dim);min-width:54px;text-align:center}
+.pie-sum{text-align:center;font-family:var(--mono);font-size:11.5px;color:var(--faint);margin-bottom:11px}
+/* legend 不再 flex:1，饼图+图例作为一个整体居中 */
 .piewrap{display:flex;gap:18px;align-items:center;flex-wrap:wrap;justify-content:center}
-.legend{flex:1;min-width:190px;display:flex;flex-direction:column;gap:7px}
+.legend{flex:0 1 300px;min-width:190px;display:flex;flex-direction:column;gap:7px}
 .lg{display:flex;align-items:center;gap:8px;font-size:12.5px}
 .lg .sw{width:9px;height:9px;border-radius:3px;flex:none}
 .lg .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -157,8 +186,9 @@ button{background:none;border:none;cursor:pointer}
 .slot .tm{font-family:var(--mono);font-size:11.5px;color:var(--dim);flex:none}
 .slot .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .slot .du{font-family:var(--mono);font-size:11.5px;color:var(--faint);flex:none}
-.slot .x{opacity:0;color:var(--faint);flex:none}
-.slot:hover .x{opacity:1}
+.slot .x,.slot .e{opacity:.4;color:var(--faint);flex:none;padding:2px 4px;border-radius:6px;display:grid;place-items:center}
+.slot:hover .x,.slot:hover .e{opacity:1}
+.slot .x:hover,.slot .e:hover{background:var(--soft);color:var(--ink)}
 .done-row{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--line)}
 .done-row:last-child{border-bottom:none}
 .done-row .ico{width:18px;height:18px;border-radius:5px;background:var(--ok);color:#fff;display:grid;place-items:center;flex:none}
@@ -172,16 +202,17 @@ button{background:none;border:none;cursor:pointer}
 .mini-in button{color:#fff;font-size:12.5px;border:1px solid #FFFFFF55;border-radius:7px;padding:4px 10px}
 
 /* ---------- 弹窗 ---------- */
-.mask{position:fixed;top:0;right:0;bottom:0;left:0;background:#33302DA8;backdrop-filter:blur(2px);display:flex;align-items:flex-end;justify-content:center;z-index:60;padding:0}
-.sheet{background:var(--card);width:100%;max-width:520px;border-radius:18px 18px 0 0;max-height:88vh;overflow-y:auto;animation:up .22s ease}
+.mask{position:fixed;top:0;right:0;bottom:0;left:0;background:#33302DA8;backdrop-filter:blur(2px);display:flex;align-items:flex-end;justify-content:center;z-index:60;padding:0;overflow:hidden;overscroll-behavior:contain}
+.sheet{background:var(--card);width:100%;max-width:520px;border-radius:18px 18px 0 0;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;animation:up .22s ease;overscroll-behavior:contain}
 @keyframes up{from{transform:translateY(28px);opacity:.6}}
 .sheet h3{padding:16px 18px 12px;font-size:15px;font-weight:600;position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--line)}
-.sb{padding:16px 18px;display:flex;flex-direction:column;gap:15px}
+.sb{padding:16px 18px;display:flex;flex-direction:column;gap:15px;overflow-y:auto;overscroll-behavior:contain}
 .sf{padding:12px 18px calc(16px + env(safe-area-inset-bottom));border-top:1px solid var(--line);display:flex;gap:9px}
 .sf .btn{flex:1;text-align:center}
 .field{display:flex;flex-direction:column;gap:6px}
 .field>label{font-size:11.5px;color:var(--faint);font-weight:500}
 .field input,.field select,.field textarea{background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:10px 11px;font-size:14px;width:100%}
+.field input + input,.field select + select,.field textarea + textarea{margin-top:8px}
 .field input:focus,.field select:focus{outline:none;border-color:var(--acc);background:var(--card)}
 .hint{font-size:11.5px;color:var(--faint);line-height:1.5}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -205,13 +236,20 @@ button{background:none;border:none;cursor:pointer}
 @media (max-width:560px){
   .dialcard{flex-direction:column;text-align:center}
   .dinfo{align-items:center}
+  .focus-count{align-self:stretch;align-items:center;text-align:center;padding:12px 0 0;max-width:none}
+  .focus-count b{font-size:32px}
   .hook{align-self:center}
   .stat3 .v{font-size:18px}
 }
+@media (max-width:760px){
+  .two{grid-template-columns:1fr}
+}
 @media (max-width:980px){
-  .wrap.focus-grid{display:block;max-width:880px;padding-top:0}
+  /* 窄屏一栏到底，回到整页滚动 */
+  .wrap.focus-grid{display:block;max-width:880px;height:auto;overflow:visible;padding:0 14px 118px}
+  .focus-grid .focus-main,.focus-grid .focus-side{overflow:visible;padding-bottom:0;padding-right:0}
   .focus-main .dialcard{margin-top:14px}
-  .focus-side{position:static;max-height:none;border-left:none;padding-left:0;margin-top:12px}
+  .focus-side{border-left:none;padding-left:0;margin-top:12px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -256,6 +294,7 @@ async function api(path, opts){
 const DAY = 86400000;
 const uid = () => Math.random().toString(36).slice(2, 9);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const countdownMarkup = s => String(s).split(/(\d+)/).map(x => x ? `<span class="${/^\d+$/.test(x) ? 'num' : 'word'}">${esc(x)}</span>` : '').join('');
 const $ = s => document.querySelector(s);
 
 function dk(ts){ const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
@@ -308,6 +347,10 @@ const OPEN = new Set();       // 展开的任务
 const OPENSET = new Set();    // 展开的待办集
 const DISMISSED_PLANS = new Set();
 let statDay = null;
+/* 饼图自己的两个维度：看到第几层、统计哪段日子。
+   pieFrom/pieTo 为 null 表示跟着上面的日期栏走，只看那一天。 */
+let pieLevel = 0;
+let pieFrom = null, pieTo = null, piePreset = 'day';
 let statMode = 'day';
 
 function seed(){
@@ -345,7 +388,7 @@ function seed(){
   return {
     tasks: T, todos: D, sessions: [], completions: [], plans: [],
     running: null,
-    settings: { examDate: '2026-12-19', showCountdown: true, countdownText: 'D-{days}', countdownSlogan: '', pomoMin: 25, mode: 'up', autoStopHours: 4 }
+    settings: { examDate: '2026-12-19', countdownText: 'D-{days}', countdownColor: '#E0562F', countdownTextColor: '#2F7D9D', pomoMin: 25, mode: 'up', autoStopHours: 4 }
   };
 }
 
@@ -468,11 +511,11 @@ function checkAutoStopped(){
   const acked = ackedAuto();
   const hit = S.sessions.filter(s => s.auto && !acked.has(s.id)).sort((a,b) => b.end - a.end)[0];
   if (!hit) return;
-  const t = byId(hit.taskId);
+  const k = sessTask(hit);
   sheet('后台自动结束了一段计时', `
     <div class="hint">计时跑满 ${S.settings.autoStopHours ?? 4} 小时还没结束，后台替你收了尾。
     如果那会儿你其实没在学，直接删掉这段。</div>
-    <div class="field"><label>任务</label><div>${t ? esc(t.name) : '（已删除）'}</div></div>
+    <div class="field"><label>任务</label><div>${esc(k.name)}${k.gone?'（已删除）':''}</div></div>
     <div class="field"><label>时间</label><div class="mono">${hhmm(hit.start)}–${hhmm(hit.end)} · ${fmtMin((hit.end-hit.start)/60000)}</div></div>
   `, `<button class="btn" data-act="drop-auto" data-id="${hit.id}">删掉这段</button>
       <button class="btn pri" data-act="keep-auto" data-id="${hit.id}">保留</button>`);
@@ -554,6 +597,14 @@ function todoDueTs(td){
   if (td.kind === 'dated') return new Date(`${td.dueDate}T${td.dueTime || '23:59'}`).getTime();
   return null;
 }
+function todoDisplayDueTs(td){
+  normalizeTodo(td);
+  const day = todoDueDay(td);
+  if (!day) return null;
+  if (td.kind === 'loop') return new Date(`${day}T23:59`).getTime();
+  const time = td.dueTime || '23:59';
+  return new Date(`${day}T${time === '24:00' ? '23:59' : time}`).getTime();
+}
 function todoDueDay(td){
   normalizeTodo(td);
   if (td.kind === 'loop') return addDays(td.cycleStart, td.cycleDays - 1);
@@ -568,6 +619,42 @@ function cycleSpan(td){
   return null;
 }
 const shortD = d => d.slice(5);
+function dueLeftText(ts, short){
+  if (!ts) return '';
+  const left = ts - Date.now();
+  const mins = Math.ceil(Math.abs(left) / 60000);
+  const hours = Math.floor(mins / 60);
+  const restMin = mins % 60;
+  if (left < 0) return mins <= 72 * 60 ? `已逾期${hours ? `${hours}h` : ''}${restMin || !hours ? `${restMin || 1}m` : ''}` : `已逾期${Math.ceil(mins / 1440)}days`;
+  if (left <= 72 * 3600000) {
+    const d = Math.floor(mins / 1440);
+    const h = Math.floor((mins % 1440) / 60);
+    const m = mins % 60;
+    const part = d ? `${d}days${h ? ` ${h}h` : ''}` : (h ? `${h}h${m ? `${m}m` : ''}` : `${m || 1}m`);
+    return `还剩${part}`;
+  }
+  const days = Math.ceil(left / 86400000);
+  return `还剩${days}days`;
+}
+function dueDayTitle(ts){
+  if (!ts) return '不限期';
+  const day = dk(ts);
+  const displayDay = hhmm(ts) === '00:00' ? addDays(day, -1) : day;
+  const d = diffDays(today(), displayDay);
+  if (d === 0) return '今日到期';
+  if (d === 1) return '明日到期';
+  const dt = new Date(fromDk(displayDay));
+  return `${dt.getMonth()+1}月${dt.getDate()}日到期`;
+}
+function dueTimeLabel(ts){
+  if (!ts) return '不限期';
+  const hm = hhmm(ts);
+  if (hm === '00:00') return `${shortD(addDays(dk(ts), -1))} 23:59`;
+  return `${shortD(dk(ts))} ${hm}`;
+}
+function displayEndTime(t){
+  return (t || '23:59') === '24:00' ? '23:59' : (t || '23:59');
+}
 function spanText(sp, short){
   if (!sp) return '不限期';
   const f = short ? shortD : (x => x);
@@ -588,12 +675,15 @@ function todoModeName(td){
 function rangeText(td, short){
   normalizeTodo(td);
   if (td.kind === 'open') return '不限期';
-  const sp = cycleSpan(td);
   const f = short ? shortD : (x => x);
-  if (td.kind === 'loop') return sp.s === sp.e ? `${f(sp.s)} 00:00-23:59` : `${f(sp.s)} 00:00 → ${f(sp.e)} 23:59`;
-  const base = spanText(sp, short);
-  if (td.kind === 'dated') return `${base} ${td.startTime || '00:00'}-${td.dueTime || '23:59'}`;
-  return base;
+  if (td.kind === 'loop'){
+    const s = f(td.cycleStart);
+    const e = f(addDays(td.cycleStart, td.cycleDays - 1));
+    return `${s} 00:00 → ${e} 23:59`;
+  }
+  const s = f(td.startDate || today());
+  const e = f(td.dueDate || today());
+  return `${s} ${td.startTime || '00:00'} → ${e} ${displayEndTime(td.dueTime)}`;
 }
 function todoMin(td){
   let ms = 0;
@@ -679,6 +769,7 @@ function todoSets(){
   const g = {};
   for (const td of S.todos){
     normalizeTodo(td);
+    if (td.planId) continue;
     let key;
     if (td.kind === 'loop') key = `loop:${td.cycleDays}`;
     else if (td.kind === 'dated' && isOverdue(td)) key = 'overdue';
@@ -690,6 +781,60 @@ function todoSets(){
   return Object.keys(g).sort((a,b) => order(a) - order(b)).map(key => {
     const list = g[key].sort((a,b) => (a.done - b.done) || (a.order - b.order));
     return { key, days: key.startsWith('loop:') ? +key.split(':')[1] : null, list };
+  });
+}
+
+function planTodos(p){
+  const start = planCycleStart(p);
+  return S.todos.filter(td => td.planId === p.id && td.planStart === start).map(normalizeTodo);
+}
+
+function renderPlanPanel(){
+  const plans = (S.plans || []).map(normalizePlan);
+  return `<div class="panel"><h3>周期自定待办</h3>
+    <div class="sb" style="padding:0;gap:10px">
+      ${plans.length ? plans.map(p => {
+        const start = planCycleStart(p);
+        const due = planDueDate(p, start);
+        const list = planTodos(p);
+        const total = list.length, done = list.filter(x => x.done).length, pct = total ? done/total : 0;
+        const open = OPENSET.has(`plan:${p.id}`);
+        return `<div class="set ${open?'open':''}">
+          <div class="set-h" data-act="fold-set" data-id="plan:${p.id}">
+            <span class="cc"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M9 5l7 7-7 7"/></svg></span>
+            <div class="set-t"><b>${esc(p.title)}</b>
+              <div class="s"><span class="rng">${start} → ${due}</span> · ${done}/${total} 完成${p.active?'':' · 已关闭'}</div></div>
+            <div class="set-pct">${Math.round(pct*100)}%</div>
+            <button class="switch" data-act="toggle-plan" data-id="${p.id}" aria-pressed="${p.active}" type="button"><i></i></button>
+            <button class="btn sm" data-act="edit-plan" data-id="${p.id}">编辑</button>
+            <button class="btn sm" data-act="new-todo" data-plan-id="${p.id}" data-plan-start="${start}">＋</button>
+          </div>
+          <div class="pbar slim"><i class="${pct>=1?'full':''}" style="width:${pct*100}%"></i></div>
+          ${open ? `<div class="set-b">${list.map(x => todoRow(x)).join('') || '<div class="empty">这个周期还没有待办</div>'}</div>` : ''}
+        </div>`;
+      }).join('') : '<div class="empty">还没有周期自定待办。右上角 ＋ 可以先建一个周期。</div>'}
+      <button class="btn" data-act="new-plan">＋ 新建周期</button>
+    </div>
+  </div>`;
+}
+
+function focusDueSets(){
+  const g = {};
+  for (const td0 of S.todos){
+    const td = normalizeTodo(td0);
+    if (td.planId) {
+      const p = planById(td.planId);
+      if (!p || normalizePlan(p).active === false) continue;
+    }
+    const due = todoDisplayDueTs(td);
+    const key = due == null ? 'open' : String(due);
+    (g[key] = g[key] || []).push(td);
+  }
+  const order = key => key === 'open' ? Number.MAX_SAFE_INTEGER : +key;
+  return Object.keys(g).sort((a,b) => order(a) - order(b)).map(key => {
+    const list = g[key].sort((a,b) => (a.done - b.done) || (a.order - b.order));
+    const due = key === 'open' ? null : +key;
+    return { key, due, list };
   });
 }
 
@@ -794,17 +939,13 @@ function renderTop(){
   const tdy = today();
   const a = fromDk(tdy), b = a + DAY;
   const tm = S.sessions.filter(s => s.end > a && s.start < b).reduce((x,s) => x + (Math.min(s.end,b)-Math.max(s.start,a)), 0) / 60000;
-  const left = diffDays(tdy, S.settings.examDate);
   const titles = { focus:'计时', todo:'待办集', stat:'数据统计', me:'我的' };
-  const cdText = esc((S.settings.countdownText || 'D-{days}').replace(/\{days\}/g, left));
-  const cd = S.settings.showCountdown && left >= 0 ? `<span class="sub">${cdText}</span>${S.settings.countdownSlogan?`<span class="sub">${esc(S.settings.countdownSlogan)}</span>`:''}` : '';
   const acts = {
-    focus: `<button class="ib" data-act="log" title="补记专注"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5l3 2"/></svg></button>
-            <button class="ib solid" data-act="new-task" title="新建任务"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></button>`,
+    focus: `<button class="ib solid" data-act="new-task" title="新建任务"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></button>`,
     todo: `<button class="ib solid" data-act="new-todo" title="新建待办"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></button>`,
     stat: '', me: ''
   };
-  $('#topbar').innerHTML = `<h1>${titles[tab]}</h1>${cd}
+  $('#topbar').innerHTML = `<h1>${titles[tab]}</h1>
     <span class="sub">今日 ${fmtMin(tm)}</span><div class="grow"></div>${acts[tab] || ''}`;
 }
 
@@ -836,26 +977,31 @@ function banner(t, depth){
       <b>${esc(t.name)}</b>
       <div class="meta">${meta}</div>
     </div>
+    ${n ? `<small class="bcount">今日已专注 ${n} 次${has && own ? ` · 本级 ${fmtMin(own)}` : ''}</small>` : ''}
     <button class="bmore" data-act="task-menu" data-id="${t.id}" aria-label="任务设置"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg></button>
     <div class="bgo">
       <button data-act="go" data-id="${t.id}">${live ? (S.running.startTs ? '暂停' : '继续') : '开始'}</button>
-      ${n ? `<small>今日已专注 ${n} 次${has && own ? ` · 本级 ${fmtMin(own)}` : ''}</small>` : ''}
     </div>
   </div>
   ${open ? kids(t.id).map(k => banner(k, Math.min(depth+1, 2))).join('') : ''}`;
 }
 function renderFocusSidebar(){
-  const sets = todoSets();
+  const sets = focusDueSets();
   return `<aside class="focus-side">
     <div class="side-title"><span>待办</span><span class="grow"></span><button class="btn sm" data-act="new-todo">＋</button></div>
-    ${sets.map(({key, list}) => {
-      const total = list.length, done = list.filter(x => x.done).length, pct = total ? done/total : 0;
-      const first = list[0], name = key === 'overdue' ? '逾期' : first ? todoModeName(first) : '';
+    ${sets.map(({key, due, list}) => {
+      const total = list.length, done = list.filter(x => x.done).length;
+      const pct = done / (total || 1);
+      const leftTxt = dueLeftText(due, true);
+      const name = due ? dueDayTitle(due) : '不限期';
+      const head = due
+        ? `<span class="s">${done}/${total} 完成 · ${leftTxt}</span>`
+        : `<span class="s">${done}/${total} 完成</span>`;
       const open = OPENSET.has(key);
       return `<div class="set ${open?'open':''}">
         <div class="set-h" data-act="fold-set" data-id="${key}">
           <span class="cc"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M9 5l7 7-7 7"/></svg></span>
-          <div class="set-t"><b>${name}</b><div class="s">${done}/${total} 完成${key==='overdue'?' · 待处理':''}</div></div>
+          <div class="set-t"><b>${name}</b>${head}</div>
         </div>
         <div class="pbar slim"><i class="${pct>=1?'full':''}" style="width:${pct*100}%"></i></div>
         ${open ? `<div class="set-b">${list.map(x => todoRow(x)).join('')}</div>` : ''}
@@ -874,12 +1020,19 @@ function renderFocus(){
   const pct = isPomo ? Math.min(1, ms/pMs) : (ms % 3600000)/3600000;
   const C = 2*Math.PI*58;
   const col = t ? solid(t) : 'var(--acc)';
+  const cdLeft = diffDays(today(), S.settings.examDate);
+  const cdText = countdownMarkup((S.settings.countdownText || 'D-{days}').replace(/\{days\}/g, cdLeft));
+  const textColor = S.settings.countdownTextColor || S.settings.countdownSloganColor || '#2F7D9D';
+  const countStyle = `--count-num:${esc(S.settings.countdownColor || '#E0562F')};--count-text:${esc(textColor)}`;
+  const focusCount = S.settings.examDate && cdLeft >= 0
+    ? `<div class="focus-count" style="${countStyle}"><b>${cdText}</b></div>`
+    : '';
 
   const dial = `<div class="dialcard">
     <div class="dial">
       <svg viewBox="0 0 132 132">
         <circle cx="66" cy="66" r="58" fill="none" stroke="#EDEFF2" stroke-width="8"/>
-        <circle cx="66" cy="66" r="58" fill="none" stroke="${over?'var(--ok)':col}" stroke-width="8" stroke-linecap="round"
+        <circle class="arc" cx="66" cy="66" r="58" fill="none" stroke="${over?'var(--ok)':col}" stroke-width="8" stroke-linecap="round"
           stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}" style="transition:stroke-dashoffset .4s linear"/>
       </svg>
       <div class="rd"><b${over?' style="color:var(--ok)"':''}>${fmtClock(shown)}</b><span>${isPomo?(over?'时间到':'番茄'):'正计时'}</span></div>
@@ -897,6 +1050,7 @@ function renderFocus(){
                         : `<button class="btn pri" data-act="resume">继续</button><button class="btn" data-act="stop">结束</button>`) : ''}
       </div>
     </div>
+    ${focusCount}
   </div>`;
 
   $('#view').innerHTML = `<main class="focus-main">${dial}<div class="bans">${kids(null).map(t => banner(t, 0)).join('')
@@ -909,7 +1063,8 @@ function renderFocus(){
 function renderTodo(){
   const sets = todoSets();
   const tdy = today();
-  $('#view').innerHTML = `<div style="height:14px"></div>` + (sets.map(({key, days, list}) => {
+  $('#view').innerHTML = `<div style="height:14px"></div>${renderPlanPanel()}
+  <div class="panel"><h3>普通待办</h3>` + (sets.map(({key, days, list}) => {
     const total = list.length;
     const done = list.filter(x => x.done).length;
     const pct = total ? done/total : 0;
@@ -919,9 +1074,8 @@ function renderTodo(){
     const spans = list.map(cycleSpan).filter(Boolean);
     const starts = spans.map(x => x.s).sort(), endsD = spans.map(x => x.e).sort();
     const spanTxt = spans.length ? spanText({ s: starts[0], e: endsD[endsD.length-1] }) : '不限期';
-    const ends = list.map(todoDueTs).filter(Boolean).sort((a,b) => a-b);
-    const nearest = ends[0] ? dk(ends[0]) : null;
-    const leftTxt = !nearest ? '' : (diffDays(tdy, nearest) <= 0 ? '今天截止' : `还剩 ${diffDays(tdy, nearest)} 天`);
+    const nearest = list.map(todoDueTs).filter(Boolean).sort((a,b) => a-b)[0];
+    const leftTxt = dueLeftText(nearest, true);
     const od = list.filter(isOverdue).length;
     const addText = key.startsWith('loop:') ? `＋ 往「${name}」里加一条` : '＋ 新建待办';
     const addPreset = key.startsWith('loop:') ? `data-kind="loop" data-days="${days}"` : key === 'dated' ? 'data-kind="dated"' : key === 'open' ? 'data-kind="open"' : 'data-kind="dated"';
@@ -938,8 +1092,8 @@ function renderTodo(){
         <div class="todo" style="justify-content:center">
           <button class="btn sm" data-act="new-todo" ${addPreset}>${addText}</button></div></div>` : ''}
     </div>`;
-  }).join('') || `<div class="empty">还没有待办。右上角 ＋ 新建，循环一样的会自动归到同一个待办集里。</div>`) +
-  `<div class="hint" style="padding:6px 4px 0">进度条按完成比例从左往右增长。</div>`;
+  }).join('') || `<div class="empty">还没有普通待办。右上角 ＋ 可以新建。</div>`) +
+  `</div><div class="hint" style="padding:6px 4px 0">进度条按完成比例从左往右增长。</div>`;
 }
 function todoRow(x){
   const t = x.taskId ? byId(x.taskId) : null;
@@ -976,6 +1130,24 @@ function settlementLabel(c){
     late_done: ['逾期已完成', 'od']
   }[kind] || ['已结算', ''];
 }
+/* 任务删了记录还留着：没 taskId 就退回名字快照，用中性灰画。
+   以后建了同名任务，后端会把 taskId 认领回去，这里自然又变回任务本身的颜色。 */
+const GONE_COL = '#B9B2A9';
+/* lv 不传 = 就算这条记录本身挂的那个任务；传了就往上提到第 lv 层
+   （操作系统在第 1 层，提到第 0 层就并进 408）。层数不够深的就是它自己。 */
+function sessTask(s, lv){
+  let t = s.taskId ? byId(s.taskId) : null;
+  if (t){
+    if (lv !== undefined) t = ancestors(t)[lv] || t;
+    return { key: t.id, name: t.name, col: solid(t), gone: false };
+  }
+  return { key: '~' + (s.taskName || ''), name: s.taskName || '（已删除）', col: GONE_COL, gone: true };
+}
+function maxTaskDepth(){ return S.tasks.reduce((m, t) => Math.max(m, depthOf(t)), 0); }
+function levelName(lv){ return lv === 0 ? '顶级' : `第 ${lv+1} 层`; }
+function firstSessionDay(){
+  return S.sessions.length ? dk(Math.min(...S.sessions.map(s => s.start))) : today();
+}
 function renderStat(){
   const day = statDay || today();
   const a = fromDk(day), b = a + DAY;
@@ -989,36 +1161,52 @@ function renderStat(){
   const dayS = S.sessions.filter(s => s.end > a && s.start < b);
   const dayMs = dayS.reduce((x,s) => x + (Math.min(s.end,b)-Math.max(s.start,a)), 0);
 
-  // 饼图：按任务名聚合（不显示待办名）
+  // 饼图有自己的范围和层级，跟下面按天看的两块不共用
+  const pf = pieFrom || day, pt = pieTo || day;
+  const [rf, rt] = pf <= pt ? [pf, pt] : [pt, pf];
+  const ra = fromDk(rf), rb = fromDk(rt) + DAY;
+  const rangeS = S.sessions.filter(s => s.end > ra && s.start < rb);
+  const rangeMin = rangeS.reduce((x,s) => x + (Math.min(s.end,rb)-Math.max(s.start,ra)), 0) / 60000;
+  const rangeDays = diffDays(rf, rt) + 1;
+  const deepest = maxTaskDepth();
+  if (pieLevel > deepest) pieLevel = deepest;      // 深的任务被删掉了就跟着退回来
+
+  // 按任务聚合（不显示待办名）。已删任务按名字快照单独成一块。
   const g = {};
-  dayS.forEach(s => { const t = byId(s.taskId); if (!t) return;
-    g[t.id] = (g[t.id]||0) + (Math.min(s.end,b)-Math.max(s.start,a))/60000; });
-  const pie = Object.entries(g).map(([id,m]) => ({ t: byId(id), m })).filter(x => x.t).sort((x,y) => y.m - x.m);
+  rangeS.forEach(s => {
+    const k = sessTask(s, pieLevel);
+    const m = (Math.min(s.end,rb)-Math.max(s.start,ra))/60000;
+    (g[k.key] = g[k.key] || { name: k.name, col: k.col, gone: k.gone, m: 0 }).m += m;
+  });
+  const pie = Object.values(g).sort((x,y) => y.m - x.m);
   const sum = pie.reduce((x,y) => x + y.m, 0) || 1;
   let ang = -Math.PI/2;
   const R = 62, cx = 74, cy = 74;
-  const slices = pie.map(({t,m}) => {
+  const slices = pie.map(({col,m}) => {
     const a1 = ang, a2 = ang + m/sum*2*Math.PI; ang = a2;
-    if (m/sum > .999) return `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${solid(t)}"/>`;
+    if (m/sum > .999) return `<circle cx="${cx}" cy="${cy}" r="${R}" fill="${col}"/>`;
     const x1 = cx+R*Math.cos(a1), y1 = cy+R*Math.sin(a1), x2 = cx+R*Math.cos(a2), y2 = cy+R*Math.sin(a2);
-    return `<path d="M${cx} ${cy}L${x1} ${y1}A${R} ${R} 0 ${a2-a1>Math.PI?1:0} 1 ${x2} ${y2}Z" fill="${solid(t)}" stroke="#fff" stroke-width="1.5"/>`;
+    return `<path d="M${cx} ${cy}L${x1} ${y1}A${R} ${R} 0 ${a2-a1>Math.PI?1:0} 1 ${x2} ${y2}Z" fill="${col}" stroke="#fff" stroke-width="1.5"/>`;
   }).join('');
 
   const comps = S.completions.filter(c => c.day === day).sort((x,y) => y.at - x.at);
   const ticks = [3,6,9,12,15,18,21].map(h => `<div class="tk" style="left:${h/24*100}%"></div>`).join('');
   const blocks = dayS.sort((x,y) => x.start-y.start).map(s => {
-    const t = byId(s.taskId); if (!t) return '';
+    const k = sessTask(s);
     const l = (Math.max(s.start,a)-a)/DAY*100, w = (Math.min(s.end,b)-Math.max(s.start,a))/DAY*100;
-    return `<div class="blk" style="left:${l}%;width:${Math.max(w,.3)}%;background:${solid(t)}" title="${esc(t.name)} ${hhmm(s.start)}–${hhmm(s.end)}"></div>`;
+    return `<div class="blk" style="left:${l}%;width:${Math.max(w,.3)}%;background:${k.col}" title="${esc(k.name)} ${hhmm(s.start)}–${hhmm(s.end)}"></div>`;
   }).join('');
 
   $('#view').innerHTML = `<div style="height:14px"></div>
   <div class="nav">
-    <button data-act="day" data-v="-1" aria-label="前一天"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></button>
-    <div><b>${day}</b> <span class="d">${weekday(day)}${day===today()?' · 今天':''}</span></div>
-    <div class="grow"></div>
-    <button data-act="day" data-v="1" ${day>=today()?'disabled':''} aria-label="后一天"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 5l7 7-7 7"/></svg></button>
-    ${day!==today()?`<button data-act="day" data-v="0" aria-label="回到今天" title="回到今天"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 11-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>`:''}
+    <div class="nav-side">
+      <button data-act="day" data-v="-1" aria-label="前一天"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 5l-7 7 7 7"/></svg></button>
+    </div>
+    <div class="nav-day"><b>${day}</b> <span class="d">${weekday(day)}${day===today()?' · 今天':''}</span></div>
+    <div class="nav-side end">
+      <button data-act="day" data-v="1" ${day>=today()?'disabled':''} aria-label="后一天"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 5l7 7-7 7"/></svg></button>
+      ${day!==today()?`<button data-act="day" data-v="0" aria-label="回到今天" title="回到今天"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 11-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>`:''}
+    </div>
   </div>
 
   <div class="stat3">
@@ -1032,24 +1220,43 @@ function renderStat(){
     <div><div class="k">当日结算待办</div><div class="v">${comps.length}</div></div>
   </div>
 
-  <div class="panel"><h3>专注时长分布 · ${day}</h3>
+  <div class="panel"><h3 class="mid">专注时长分布 · ${rf === rt ? rf : `${rf} → ${rt}`}</h3>
+    <div class="pie-ctl">
+      <button data-act="pie-preset" data-v="day" aria-pressed="${piePreset==='day'}">当天</button>
+      <button data-act="pie-preset" data-v="7" aria-pressed="${piePreset==='7'}">近 7 天</button>
+      <button data-act="pie-preset" data-v="30" aria-pressed="${piePreset==='30'}">近 30 天</button>
+      <button data-act="pie-preset" data-v="all" aria-pressed="${piePreset==='all'}">全部</button>
+      <input type="date" id="pie-from" data-act="pie-range" value="${rf}" max="${today()}" aria-label="起始日期">
+      <span>→</span>
+      <input type="date" id="pie-to" data-act="pie-range" value="${rt}" max="${today()}" aria-label="结束日期">
+    </div>
+    <div class="pie-ctl">
+      <button data-act="pie-level" data-v="-1" ${pieLevel<=0?'disabled':''}>← 上一级</button>
+      <span class="lv">${levelName(pieLevel)}</span>
+      <button data-act="pie-level" data-v="1" ${pieLevel>=deepest?'disabled':''}>下一级 →</button>
+    </div>
+    <div class="pie-sum">共 ${fmtMin(rangeMin)} · ${rangeS.length} 次${
+      rangeDays > 1 ? ` · ${rangeDays} 天 · 日均 ${fmtMin(rangeMin/rangeDays)}` : ''}</div>
     ${pie.length ? `<div class="piewrap">
       <svg width="148" height="148" viewBox="0 0 148 148">${slices}</svg>
-      <div class="legend">${pie.map(({t,m}) => `<div class="lg"><span class="sw" style="background:${solid(t)}"></span>
-        <span class="nm">${esc(t.name)}</span><span class="vv">${fmtMin(m)} · ${Math.round(m/sum*100)}%</span></div>`).join('')}</div>
-    </div>` : `<div class="empty">这天还没有专注记录</div>`}
+      <div class="legend">${pie.map(({name,col,gone,m}) => `<div class="lg"><span class="sw" style="background:${col}"></span>
+        <span class="nm">${esc(name)}${gone?' <span class="pill">已删除</span>':''}</span><span class="vv">${fmtMin(m)} · ${Math.round(m/sum*100)}%</span></div>`).join('')}</div>
+    </div>` : `<div class="empty">${rangeDays > 1 ? '这段时间' : '这天'}还没有专注记录</div>`}
   </div>
 
-  <div class="panel"><h3>时间段分布</h3>
+  <div class="panel">
+    <div class="ph"><h3>时间段分布</h3>
+      <button class="ib" data-act="log" title="补记专注" aria-label="补记专注">＋</button></div>
     <div class="track">${ticks}${blocks}</div>
     <div class="axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
     <div style="margin-top:10px">${dayS.map(s => {
-      const t = byId(s.taskId); const td = s.todoId ? todoById(s.todoId) : null;
-      return `<div class="slot"><span class="sw" style="width:8px;height:8px;border-radius:3px;background:${t?solid(t):'#ccc'};flex:none"></span>
+      const k = sessTask(s); const td = s.todoId ? todoById(s.todoId) : null;
+      return `<div class="slot"><span class="sw" style="width:8px;height:8px;border-radius:3px;background:${k.col};flex:none"></span>
         <span class="tm">${hhmm(s.start)}–${hhmm(s.end)}</span>
-        <span class="nm">${t?esc(t.name):'（已删除）'}${td?` <span style="color:var(--faint)">· ${esc(td.title)}</span>`:''}</span>
+        <span class="nm">${esc(k.name)}${k.gone?' <span class="pill">已删除</span>':''}${td?` <span style="color:var(--faint)">· ${esc(td.title)}</span>`:''}</span>
         <span class="du">${fmtMin((s.end-s.start)/60000)}</span>
         ${s.manual?'<span class="pill">补记</span>':''}${s.auto?'<span class="pill od">自动结束</span>':''}
+        <button class="e" data-act="edit-sess" data-id="${s.id}" title="改时间" aria-label="改时间"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4L19.5 8.5a2.1 2.1 0 00-3-3L5 17v3z"/></svg></button>
         <button class="x" data-act="del-sess" data-id="${s.id}">✕</button></div>`;
     }).join('') || '<div class="empty">无</div>'}</div>
   </div>
@@ -1077,28 +1284,16 @@ function renderMe(){
   <div class="panel"><h3>偏好</h3>
     <div class="sb" style="padding:0;gap:14px">
       <div class="field"><label>倒计时目标日期（不需要就关掉显示）</label><input type="date" id="m-exam" value="${s.examDate}"></div>
-      <div class="field"><label>顶栏显示倒计时</label>
-        <div class="seg" id="m-cd"><button data-v="1" aria-pressed="${s.showCountdown}">显示</button><button data-v="0" aria-pressed="${!s.showCountdown}">隐藏</button></div></div>
       <div class="field"><label>倒计时文案（用 {days} 表示天数）</label><input id="m-count-text" value="${esc(s.countdownText || 'D-{days}')}"></div>
-      <div class="field"><label>倒计时标语</label><input id="m-count-slogan" value="${esc(s.countdownSlogan || '')}" placeholder="例如：稳住节奏"></div>
+      <div class="two">
+        <div class="field"><label>倒计时数字颜色</label><input id="m-count-color" type="color" value="${esc(s.countdownColor || '#E0562F')}"></div>
+        <div class="field"><label>倒计时文字颜色</label><input id="m-count-text-color" type="color" value="${esc(s.countdownTextColor || s.countdownSloganColor || '#2F7D9D')}"></div>
+      </div>
       <div class="field"><label>番茄时长（分钟）</label><input type="number" min="1" max="180" id="m-pomo" value="${s.pomoMin}"></div>
       <div class="field"><label>计时超过几小时自动结束（0 = 不自动结束）</label>
         <input type="number" min="0" max="24" step="0.5" id="m-autostop" value="${s.autoStopHours ?? 4}">
         <div class="hint">忘了点结束时的兜底，后台会替你收尾并标记为自动结束。</div></div>
       <button class="btn pri" data-act="save-me">保存</button>
-    </div>
-  </div>
-  <div class="panel"><h3>周期自定待办</h3>
-    <div class="sb" style="padding:0;gap:10px">
-      ${(S.plans || []).map(p => {
-        normalizePlan(p);
-        const t = p.taskId ? byId(p.taskId) : null;
-        const start = planCycleStart(p);
-        return `<div class="slot"><span class="nm">${esc(p.title)}</span><span class="du">每 ${p.cycleDays} 天</span>
-          <span class="pill">${start} 开始</span>${t?`<span class="pill"><span class="sw" style="background:${solid(t)}"></span>${esc(t.name)}</span>`:''}
-          <button class="x" data-act="edit-plan" data-id="${p.id}" style="opacity:1">✎</button></div>`;
-      }).join('') || '<div class="empty">还没有周期自定待办</div>'}
-      <button class="btn" data-act="new-plan">＋ 新建周期自定待办</button>
     </div>
   </div>
   <div class="panel"><h3>数据</h3>
@@ -1127,9 +1322,13 @@ function renderMini(){
 }
 
 /* ================= 弹窗 ================= */
-function closeSheet(){ $('#modals').innerHTML = ''; }
+function closeSheet(){
+  $('#modals').innerHTML = '';
+  document.body.classList.remove('modal-open');
+}
 function sheet(title, body, foot){
   $('#modals').innerHTML = `<div class="mask" data-act="mask"><div class="sheet"><h3>${title}</h3><div class="sb">${body}</div><div class="sf">${foot}</div></div></div>`;
+  document.body.classList.add('modal-open');
 }
 function taskPickList(sel, allowNone){
   const rows = [];
@@ -1137,11 +1336,17 @@ function taskPickList(sel, allowNone){
     rows.push(`<div class="pick" data-pick-task="${t.id}" style="padding-left:${12+d*16}px">
       <span class="sw" style="background:${solid(t)}"></span>
       <div style="flex:1"><div>${esc(t.name)}</div>${d?`<div class="p">${esc(pathOf(t))}</div>`:''}</div>
-      ${sel===t.id?'<span style="color:var(--acc)">✓</span>':''}</div>`);
+      <span class="picked" style="color:var(--acc)">${sel===t.id?'✓':''}</span></div>`);
     walk(t.id, d+1);
   });
   walk(null, 0);
-  return `<div class="picklist">${allowNone?`<div class="pick" data-pick-task=""><span class="sw" style="background:#CBD2DA"></span><div style="flex:1">不挂钩任务</div>${!sel?'<span style="color:var(--acc)">✓</span>':''}</div>`:''}${rows.join('')}</div>`;
+  return `<div class="picklist">${allowNone?`<div class="pick" data-pick-task=""><span class="sw" style="background:#CBD2DA"></span><div style="flex:1">不挂钩任务</div><span class="picked" style="color:var(--acc)">${!sel?'✓':''}</span></div>`:''}${rows.join('')}</div>`;
+}
+function markPicked(root, selected){
+  root.querySelectorAll('[data-pick-task]').forEach(p => {
+    const m = p.querySelector('.picked');
+    if (m) m.textContent = (p.dataset.pickTask || '') === (selected || '') ? '✓' : '';
+  });
 }
 
 function openTaskMenu(id){
@@ -1174,19 +1379,26 @@ function openNewTask(parentId){
   gw.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return;
     gw.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); });
 }
-function openTodo(id, presetDays, presetKind){
+function openTodo(id, presetDays, presetKind, presetPlanId, presetPlanStart){
   const x = id ? normalizeTodo(todoById(id)) : null;
-  let kind = x ? x.kind : (presetKind || 'loop');
+  const planId = x ? x.planId : (presetPlanId || null);
+  const planStart = x ? x.planStart : (presetPlanStart || null);
+  const plan = planId ? planById(planId) : null;
+  const planCycleStartDate = plan ? (planStart || planCycleStart(plan)) : null;
+  const planCycleDueDate = plan ? planDueDate(plan, planCycleStartDate) : null;
+  let kind = plan ? 'dated' : (x ? x.kind : (presetKind || 'loop'));
   let days = x && x.kind === 'loop' ? x.cycleDays : (presetDays !== undefined ? +presetDays : 1);
   if (!['loop','dated','open'].includes(kind)) kind = 'loop';
-  const startDate = x ? (x.kind === 'loop' ? x.cycleStart : x.startDate || today()) : today();
-  const startTime = x ? (x.startTime || '00:00') : '00:00';
-  const dueDate = x ? (x.kind === 'dated' ? x.dueDate : addDays(startDate, Math.max(1, days) - 1)) : today();
-  const dueTime = x ? (x.dueTime || '23:59') : '23:59';
+  const startDate = plan ? planCycleStartDate : (x ? (x.kind === 'loop' ? x.cycleStart : x.startDate || today()) : today());
+  const startTime = plan ? '00:00' : (x ? (x.startTime || '00:00') : '00:00');
+  const dueDate = plan ? planCycleDueDate : (x ? (x.kind === 'dated' ? x.dueDate : addDays(startDate, Math.max(1, days) - 1)) : today());
+  const dueTime = plan ? '23:59' : (x ? (x.dueTime || '23:59') : '23:59');
   const custom = ![1,3,7].includes(days);
   const repeatOn = kind !== 'dated';
   sheet(x ? '编辑待办' : '新建待办', `
     <div class="field"><label>内容</label><input id="d-title" value="${x?esc(x.title):''}" placeholder="例如：背单词 200 个" autofocus></div>
+    ${plan ? `<div class="field"><label>所属周期</label><div class="hint">${esc(plan.title)} · ${planCycleStartDate} → ${planCycleDueDate}</div></div>` : ''}
+    ${plan ? '' : `
     <div class="field"><label>类型</label>
       <div class="seg" id="d-kind">
         <button data-v="loop" aria-pressed="${kind==='loop'}">循环</button>
@@ -1203,7 +1415,7 @@ function openTodo(id, presetDays, presetKind){
       <button class="switch" id="d-repeat" aria-pressed="${repeatOn}" type="button"><i></i></button>
       <div class="hint">开启时按自定义天数循环；关闭时是一条有开始和结束时间的待办。</div></div>
     <div class="field" id="d-cwrap">
-      <label>自定义天数</label><input id="d-days" type="number" min="1" max="365" value="${custom?days:5}"></div>
+      <label>自定义天数</label><input id="d-days" type="number" min="1" max="365" value="${days}"></div>
     <div class="two" id="d-loop-dates">
       <div class="field"><label>开始日期</label><input id="d-start-date" type="date" value="${startDate}"></div>
       <div class="field"><label>结束日期</label><input id="d-loop-end" type="date" value="${addDays(startDate, Math.max(1, custom?days:days) - 1)}"></div>
@@ -1218,7 +1430,7 @@ function openTodo(id, presetDays, presetKind){
         <button data-v="keep" aria-pressed="${x&&x.onExpire==='keep'}">保留逾期状态</button>
       </div>
       <div class="hint">重置：新周期从零开始，之前投入的时间不再算在这条待办头上（专注记录本身不会删）。<br>
-      保留：周期不往前推，它会一直挂着并标红，投入时间继续累加，直到你勾掉。</div></div>
+      保留：周期不往前推，它会一直挂着并标红，投入时间继续累加，直到你勾掉。</div></div>`}
     <div class="field"><label>挂钩任务（计时归到哪个任务名下）</label>
       <div id="d-task">${taskPickList(x?x.taskId:null, true)}</div></div>
   `, `${x?`<button class="btn" data-act="del-todo" data-id="${x.id}">删除</button>`:''}
@@ -1229,8 +1441,13 @@ function openTodo(id, presetDays, presetKind){
   $('#d-task').addEventListener('click', e => {
     const p = e.target.closest('[data-pick-task]'); if (!p) return;
     pickTask = p.dataset.pickTask || null;
-    $('#d-task').innerHTML = taskPickList(pickTask, true);
+    markPicked($('#d-task'), pickTask);
   });
+  if (plan) {
+    window.__todoPlan = { id: plan.id, start: planCycleStartDate };
+    window.__pickTask = () => pickTask;
+    return;
+  }
   const refreshTodoForm = () => {
     const k = $('#d-kind').querySelector('[aria-pressed=true]').dataset.v;
     const cv = $('#d-cyc').querySelector('[aria-pressed=true]').dataset.v;
@@ -1244,9 +1461,13 @@ function openTodo(id, presetDays, presetKind){
     $('#d-dated-dates').style.display = (k === 'dated' || (k === 'loop' && isCustom && !repeat)) ? '' : 'none';
     $('#d-exp-wrap').style.display = asLoop ? '' : 'none';
   };
+  const currentLoopDays = () => {
+    const cv = $('#d-cyc').querySelector('[aria-pressed=true]').dataset.v;
+    return cv === 'c' ? Math.max(1, +$('#d-days').value || 1) : Math.max(1, +cv || 1);
+  };
   const syncLoopEnd = () => {
     const sd = $('#d-start-date').value || today();
-    const days = Math.max(1, +$('#d-days').value || 1);
+    const days = currentLoopDays();
     $('#d-loop-end').value = addDays(sd, days - 1);
   };
   const syncDaysFromEnd = () => {
@@ -1263,6 +1484,7 @@ function openTodo(id, presetDays, presetKind){
     const b = e.target.closest('button'); if (!b) return;
     $('#d-cyc').querySelectorAll('button').forEach(z => z.setAttribute('aria-pressed', z === b));
     if (b.dataset.v !== 'c') $('#d-repeat').setAttribute('aria-pressed', 'true');
+    if (b.dataset.v !== 'c') $('#d-days').value = b.dataset.v;
     refreshTodoForm(); syncLoopEnd();
   });
   $('#d-repeat').addEventListener('click', e => {
@@ -1271,6 +1493,7 @@ function openTodo(id, presetDays, presetKind){
     refreshTodoForm();
   });
   $('#d-days').addEventListener('input', syncLoopEnd);
+  $('#d-start-date').addEventListener('input', syncLoopEnd);
   $('#d-start-date').addEventListener('change', syncLoopEnd);
   $('#d-loop-end').addEventListener('change', syncDaysFromEnd);
   $('#d-exp').addEventListener('click', e => {
@@ -1278,6 +1501,7 @@ function openTodo(id, presetDays, presetKind){
     $('#d-exp').querySelectorAll('button').forEach(z => z.setAttribute('aria-pressed', z === b));
   });
   refreshTodoForm();
+  window.__todoPlan = plan ? { id: plan.id, start: planStart || planCycleStart(plan) } : null;
   window.__pickTask = () => pickTask;
 }
 function openHook(){
@@ -1295,24 +1519,30 @@ function openHook(){
     </div>
   `, `<button class="btn" data-act="mask">关闭</button>`);
 }
-function openLog(){
+function openLog(sid){
+  const ex = sid ? S.sessions.find(x => x.id === sid) : null;   // 传了 id 就是改已有记录
   const now = new Date();
-  const p = new Date(now - 3600000);
   const f = d => `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-  sheet('补记专注时间', `
-    <div class="field"><label>任务</label><div id="g-task">${taskPickList(S.tasks[0]?.id, false)}</div></div>
-    <div class="field"><label>日期</label><input type="date" id="g-day" value="${statDay||today()}"></div>
+  const sT = ex ? new Date(ex.start) : new Date(now - 3600000);
+  const eT = ex ? new Date(ex.end) : now;
+  const day = ex ? dk(ex.start) : (statDay || today());
+  const init = (ex && ex.taskId) || S.tasks[0]?.id;
+  sheet(ex ? '编辑专注记录' : '补记专注时间', `
+    ${ex && !ex.taskId && ex.taskName ? `<div class="hint">原任务「${esc(ex.taskName)}」已删除。保存会把这段挂到你选的任务上。</div>` : ''}
+    <div class="field"><label>任务</label><div id="g-task">${taskPickList(init, false)}</div></div>
+    <div class="field"><label>日期</label><input type="date" id="g-day" value="${day}"></div>
     <div class="two">
-      <div class="field"><label>开始</label><input type="time" id="g-s" value="${f(p)}"></div>
-      <div class="field"><label>结束</label><input type="time" id="g-e" value="${f(now)}"></div>
+      <div class="field"><label>开始</label><input type="time" id="g-s" value="${f(sT)}"></div>
+      <div class="field"><label>结束</label><input type="time" id="g-e" value="${f(eT)}"></div>
     </div>
     <div class="field"><label>挂钩待办（可选）</label>
-      <select id="g-todo"><option value="">不挂钩</option>${S.todos.filter(x=>!x.done).map(x=>`<option value="${x.id}">${esc(x.title)}</option>`).join('')}</select></div>
-  `, `<button class="btn" data-act="mask">取消</button><button class="btn pri" data-act="save-log">记录</button>`);
-  let pick = S.tasks[0]?.id;
+      <select id="g-todo"><option value="">不挂钩</option>${S.todos.filter(x => !x.done || (ex && x.id === ex.todoId)).map(x=>`<option value="${x.id}"${ex && ex.todoId === x.id ? ' selected' : ''}>${esc(x.title)}</option>`).join('')}</select></div>
+  `, `<button class="btn" data-act="mask">取消</button><button class="btn pri" data-act="save-log"${ex?` data-id="${ex.id}"`:''}>${ex?'保存':'记录'}</button>`);
+  let pick = init;
   $('#g-task').addEventListener('click', e => {
     const p2 = e.target.closest('[data-pick-task]'); if (!p2) return;
-    pick = p2.dataset.pickTask; $('#g-task').innerHTML = taskPickList(pick, false);
+    pick = p2.dataset.pickTask;
+    markPicked($('#g-task'), pick);
   });
   window.__pickTask = () => pick;
 }
@@ -1322,21 +1552,11 @@ function openPlan(id){
     <div class="field"><label>待办内容</label><input id="pl-title" value="${p?esc(p.title):''}" placeholder="例如：本周真题一套 + 订正" autofocus></div>
     <div class="two">
       <div class="field"><label>周期开始日</label><input id="pl-start" type="date" value="${p?p.startDate:today()}"></div>
-      <div class="field"><label>每隔多少天提醒</label><input id="pl-cycle" type="number" min="1" max="365" value="${p?p.cycleDays:7}"></div>
+      <div class="field"><label>周期天数</label><input id="pl-cycle" type="number" min="1" max="365" value="${p?p.cycleDays:7}"></div>
     </div>
-    <div class="field"><label>创建后期限天数</label><input id="pl-due" type="number" min="1" max="365" value="${p?p.dueDays:7}">
-      <div class="hint">提醒创建出来的是一次性有期限待办，不会自己循环。</div></div>
-    <div class="field"><label>挂钩任务</label><div id="pl-task">${taskPickList(p?p.taskId:null, true)}</div></div>
   `, `${p?`<button class="btn" data-act="del-plan" data-id="${p.id}">删除</button>`:''}
       <button class="btn" data-act="mask">取消</button>
       <button class="btn pri" data-act="save-plan" data-id="${p?p.id:''}">${p?'保存':'创建'}</button>`);
-  let pickTask = p ? p.taskId : null;
-  $('#pl-task').addEventListener('click', e => {
-    const t = e.target.closest('[data-pick-task]'); if (!t) return;
-    pickTask = t.dataset.pickTask || null;
-    $('#pl-task').innerHTML = taskPickList(pickTask, true);
-  });
-  window.__pickTask = () => pickTask;
 }
 
 /* ================= 提示 ================= */
@@ -1360,9 +1580,33 @@ function render(){
   document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
   setTimeout(remindPlan, 0);
 }
+/* 每秒只改表盘那几个字和那圈进度，不重建 DOM。
+   横幅上的时长次数都来自 sessions，正在跑的这段还没落库，本来就不用每秒动；
+   整页重画一次会把两栏的滚动位置抹回顶上。真变了的时候走 render()。 */
+function tickFocus(){
+  const dial = $('#view').querySelector('.dial');
+  if (!dial) return renderFocus();
+  const r = S.running, ms = elapsed();
+  const isPomo = S.settings.mode === 'pomo', pMs = S.settings.pomoMin * 60000;
+  const over = isPomo && ms >= pMs;
+  const shown = isPomo ? Math.max(0, pMs - ms) : ms;
+  const pct = isPomo ? Math.min(1, ms/pMs) : (ms % 3600000)/3600000;
+  const t = r ? byId(r.taskId) : null;
+
+  const num = dial.querySelector('.rd b'), lab = dial.querySelector('.rd span');
+  const arc = dial.querySelector('circle.arc');
+  if (num){ num.textContent = fmtClock(shown); num.style.color = over ? 'var(--ok)' : ''; }
+  if (lab) lab.textContent = isPomo ? (over ? '时间到' : '番茄') : '正计时';
+  if (arc){
+    arc.setAttribute('stroke-dashoffset', 2*Math.PI*58*(1-pct));
+    arc.setAttribute('stroke', over ? 'var(--ok)' : (t ? solid(t) : 'var(--acc)'));
+  }
+  if (isPomo && over && r && r.startTs && !pomoAlerted){ pomoAlerted = true; beep(); }
+}
 function tick(){
-  if (!S || !S.running || !S.running.startTs) return;
-  if (tab === 'focus') renderFocus(); else renderMini();
+  if (!S) return;
+  if (tab === 'focus') tickFocus();
+  else if (S.running && S.running.startTs) renderMini();
 }
 
 /* ================= 事件 ================= */
@@ -1391,15 +1635,36 @@ document.addEventListener('click', e => {
     case 'task-menu': e.stopPropagation(); openTaskMenu(id); break;
     case 'new-task': openNewTask(null); break;
     case 'new-child': closeSheet(); openNewTask(id); break;
-    case 'new-todo': openTodo(null, el.dataset.days, el.dataset.kind); break;
+    case 'new-todo': openTodo(null, el.dataset.days, el.dataset.kind, el.dataset.planId, el.dataset.planStart); break;
     case 'edit-todo': openTodo(id); break;
     case 'new-plan': openPlan(null); break;
     case 'edit-plan': openPlan(id); break;
+    case 'toggle-plan': {
+      const p = planById(id); if (!p) return;
+      p.active = !p.active;
+      save(); render(); break; }
     case 'log': openLog(); break;
+    case 'edit-sess': openLog(id); break;
+
+    case 'pie-level':
+      pieLevel = Math.max(0, Math.min(maxTaskDepth(), pieLevel + (+el.dataset.v)));
+      renderStat(); break;
+
+    case 'pie-preset': {
+      const v = el.dataset.v, d = statDay || today();
+      piePreset = v;
+      if (v === 'day') pieFrom = pieTo = null;                    // 跟着上面的日期栏
+      else if (v === 'all'){ pieFrom = firstSessionDay(); pieTo = today(); }
+      else { pieTo = d; pieFrom = addDays(d, -(+v - 1)); }
+      renderStat(); break; }
     case 'day': {
       const v = +el.dataset.v;
       statDay = v === 0 ? today() : addDays(statDay || today(), v);
       if (statDay > today()) statDay = today();
+      // 「近 N 天」跟着看的这天走；「当天」本来就跟着走；「全部」和自定义不动
+      if (piePreset === '7' || piePreset === '30'){
+        pieTo = statDay; pieFrom = addDays(statDay, -(+piePreset - 1));
+      }
       renderStat(); break; }
     case 'del-sess': {
       if (!confirm('删除这段专注记录？当日统计时长会一起减少。')) return;
@@ -1428,59 +1693,79 @@ document.addEventListener('click', e => {
       if (sel) t.g = GRAD[+sel.dataset.gi];
       save(); closeSheet(); render(); break; }
 
+    /* 删任务不动统计：记录留着，只把任务名存成快照。之后建了同名任务后端会自动认领回去。 */
     case 'del-task': {
       const ids = subtree(id);
-      if (!confirm(`删除「${byId(id).name}」${ids.length>1?`及其 ${ids.length-1} 个子任务`:''}？相关专注记录也会删掉。`)) return;
-      const dropIds = S.sessions.filter(s => ids.includes(s.taskId)).map(s => s.id);
+      if (!confirm(`删除「${byId(id).name}」${ids.length>1?`及其 ${ids.length-1} 个子任务`:''}？\n专注记录会留在统计里，以后建同名任务会自动接回去。`)) return;
+      const dropped = ids.map(byId).filter(Boolean).map(x => ({ id: x.id, name: x.name }));
+      const nameOf = {}; dropped.forEach(x => { nameOf[x.id] = x.name; });
       S.tasks = S.tasks.filter(t => !ids.includes(t.id));
-      S.sessions = S.sessions.filter(s => !ids.includes(s.taskId));
+      S.sessions.forEach(s => { if (nameOf[s.taskId]){ s.taskName = nameOf[s.taskId]; s.taskId = null; } });
       S.todos.forEach(x => { if (ids.includes(x.taskId)) x.taskId = null; });
       S.plans.forEach(x => { if (ids.includes(x.taskId)) x.taskId = null; });
       if (S.running && ids.includes(S.running.taskId)) stopTimer();
       save(); closeSheet(); render();
-      if (dropIds.length)
-        api('/api/sessions/delete', { method: 'POST', body: JSON.stringify({ ids: dropIds }) })
-          .then(({data}) => { S.sessions = data.sessions; SREV = data.srev; })
-          .catch(() => {});
+      api('/api/sessions/orphan', { method: 'POST', body: JSON.stringify({ tasks: dropped }) })
+        .then(({data}) => { S.sessions = data.sessions; SREV = data.srev; render(); })
+        .catch(() => toast('记录留住了，但没同步到后台'));
       break; }
 
     case 'save-todo': {
       const title = $('#d-title').value.trim(); if (!title) return toast('先写点内容');
-      const formKind = $('#d-kind').querySelector('[aria-pressed=true]').dataset.v;
-      const cv = $('#d-cyc').querySelector('[aria-pressed=true]').dataset.v;
-      const repeat = $('#d-repeat').getAttribute('aria-pressed') === 'true';
-      let kind = formKind;
-      if (formKind === 'loop' && cv === 'c' && !repeat) kind = 'dated';
-      const days = cv === 'c' ? Math.max(1, +$('#d-days').value || 1) : +cv;
-      const onExpire = $('#d-exp').querySelector('[aria-pressed=true]')?.dataset.v || 'reset';
       const taskId = window.__pickTask ? window.__pickTask() : null;
-      const startDate = kind === 'loop' ? ($('#d-start-date').value || today()) : ($('#d-start-dt').value || today());
-      const startTime = kind === 'dated' ? ($('#d-start-time').value || '00:00') : '00:00';
-      const dueDate = kind === 'loop' ? addDays(startDate, Math.max(1, days) - 1) : ($('#d-due-date').value || today());
-      const dueTime = kind === 'dated' ? ($('#d-due-time').value || '23:59') : '23:59';
-      if (kind === 'dated' && new Date(`${dueDate}T${dueTime}`).getTime() <= new Date(`${startDate}T${startTime}`).getTime()) return toast('结束时间要晚于开始时间');
-      if (id){
-        const x = todoById(id);
-        normalizeTodo(x);
-        const changedBase = x.kind !== kind || x.cycleDays !== days || (kind === 'loop' && x.cycleStart !== startDate) || (kind === 'dated' && (x.startDate !== startDate || x.startTime !== startTime));
-        Object.assign(x, { title, kind, cycleDays: kind === 'loop' ? days : 0, onExpire, taskId,
-          cycleStart: kind === 'loop' ? startDate : undefined,
-          startDate: kind === 'dated' ? startDate : undefined,
-          startTime: kind === 'dated' ? startTime : undefined,
-          dueDate: kind === 'dated' ? dueDate : undefined,
-          dueTime: kind === 'dated' ? dueTime : undefined });
-        if (changedBase) x.timeBase = kind === 'loop' ? fromDk(startDate) : kind === 'dated' ? new Date(`${startDate}T${startTime}`).getTime() : Date.now();
+      const planCtx = window.__todoPlan || null;
+      if (planCtx) {
+        const p = planById(planCtx.id);
+        if (!p) return toast('这个周期已经没了');
+        const startDate = planCtx.start || planCycleStart(p);
+        const dueDate = planDueDate(p, startDate);
+        const payload = {
+          id: uid(), title, taskId, kind: 'dated', cycleDays: 0, onExpire: 'reset',
+          cycleStart: undefined, startDate, startTime: '00:00', dueDate, dueTime: '23:59',
+          timeBase: fromDk(startDate), planId: p.id, planStart: startDate,
+          done: false, doneAt: null, order: S.todos.length
+        };
+        if (id) Object.assign(todoById(id), payload);
+        else S.todos.push(payload);
       } else {
-        S.todos.push({ id: uid(), title, taskId, kind, cycleDays: kind === 'loop' ? days : 0, onExpire,
-          cycleStart: kind === 'loop' ? startDate : undefined,
-          startDate: kind === 'dated' ? startDate : undefined,
-          startTime: kind === 'dated' ? startTime : undefined,
-          dueDate: kind === 'dated' ? dueDate : undefined,
-          dueTime: kind === 'dated' ? dueTime : undefined,
-          timeBase: kind === 'loop' ? fromDk(startDate) : kind === 'dated' ? new Date(`${startDate}T${startTime}`).getTime() : Date.now(),
-          done: false, doneAt: null, order: S.todos.length });
-        OPENSET.add(kind === 'loop' ? `loop:${days}` : kind);
+        const formKind = $('#d-kind').querySelector('[aria-pressed=true]').dataset.v;
+        const cv = $('#d-cyc').querySelector('[aria-pressed=true]').dataset.v;
+        const repeat = $('#d-repeat').getAttribute('aria-pressed') === 'true';
+        let kind = formKind;
+        if (formKind === 'loop' && cv === 'c' && !repeat) kind = 'dated';
+        const days = cv === 'c' ? Math.max(1, +$('#d-days').value || 1) : +cv;
+        const onExpire = $('#d-exp').querySelector('[aria-pressed=true]')?.dataset.v || 'reset';
+        const startDate = kind === 'loop' ? ($('#d-start-date').value || today()) : ($('#d-start-dt').value || today());
+        const startTime = kind === 'dated' ? ($('#d-start-time').value || '00:00') : '00:00';
+        const dueDate = kind === 'loop' ? addDays(startDate, Math.max(1, days) - 1) : ($('#d-due-date').value || today());
+        const dueTime = kind === 'dated' ? ($('#d-due-time').value || '23:59') : '23:59';
+        if (kind === 'dated' && new Date(`${dueDate}T${dueTime}`).getTime() <= new Date(`${startDate}T${startTime}`).getTime()) return toast('结束时间要晚于开始时间');
+        if (id){
+          const x = todoById(id);
+          normalizeTodo(x);
+          const changedBase = x.kind !== kind || x.cycleDays !== days || (kind === 'loop' && x.cycleStart !== startDate) || (kind === 'dated' && (x.startDate !== startDate || x.startTime !== startTime));
+          Object.assign(x, { title, kind, cycleDays: kind === 'loop' ? days : 0, onExpire, taskId,
+            cycleStart: kind === 'loop' ? startDate : undefined,
+            startDate: kind === 'dated' ? startDate : undefined,
+            startTime: kind === 'dated' ? startTime : undefined,
+            dueDate: kind === 'dated' ? dueDate : undefined,
+            dueTime: kind === 'dated' ? dueTime : undefined,
+            planId: undefined, planStart: undefined });
+          if (changedBase) x.timeBase = kind === 'loop' ? fromDk(startDate) : kind === 'dated' ? new Date(`${startDate}T${startTime}`).getTime() : Date.now();
+        } else {
+          S.todos.push({ id: uid(), title, taskId, kind, cycleDays: kind === 'loop' ? days : 0, onExpire,
+            cycleStart: kind === 'loop' ? startDate : undefined,
+            startDate: kind === 'dated' ? startDate : undefined,
+            startTime: kind === 'dated' ? startTime : undefined,
+            dueDate: kind === 'dated' ? dueDate : undefined,
+            dueTime: kind === 'dated' ? dueTime : undefined,
+            timeBase: kind === 'loop' ? fromDk(startDate) : kind === 'dated' ? new Date(`${startDate}T${startTime}`).getTime() : Date.now(),
+            planId: undefined, planStart: undefined,
+            done: false, doneAt: null, order: S.todos.length });
+          OPENSET.add(kind === 'loop' ? `loop:${days}` : kind);
+        }
       }
+      window.__todoPlan = null;
       save(); closeSheet(); tab = 'todo'; render(); break; }
 
     case 'del-todo': {
@@ -1501,13 +1786,14 @@ document.addEventListener('click', e => {
 
     case 'save-plan': {
       const title = $('#pl-title').value.trim(); if (!title) return toast('先写点内容');
+      const prev = id ? planById(id) : null;
+      const cycleDays = Math.max(1, +$('#pl-cycle').value || 7);
       const data = {
         title,
-        taskId: window.__pickTask ? window.__pickTask() : null,
         startDate: $('#pl-start').value || today(),
-        cycleDays: Math.max(1, +$('#pl-cycle').value || 7),
-        dueDays: Math.max(1, +$('#pl-due').value || 7),
-        active: true
+        cycleDays,
+        dueDays: cycleDays,
+        active: prev ? !!prev.active : true
       };
       if (id) Object.assign(planById(id), data);
       else S.plans.push(Object.assign({ id: uid(), createdAt: Date.now() }, data));
@@ -1535,7 +1821,7 @@ document.addEventListener('click', e => {
       const start = el.dataset.start || planCycleStart(p);
       const dueDate = $('#p-make-due').value || planDueDate(p, start);
       const title = $('#p-make-title').value.trim() || p.title;
-      S.todos.push({ id: uid(), title, taskId: p.taskId || null, kind: 'dated', cycleDays: 0,
+      S.todos.push({ id: uid(), title, taskId: null, kind: 'dated', cycleDays: 0,
         startDate: start, startTime: '00:00', dueDate, dueTime: '23:59',
         planId: p.id, planStart: start, timeBase: fromDk(start), done: false, doneAt: null, order: S.todos.length });
       p.lastCreated = start;
@@ -1549,19 +1835,34 @@ document.addEventListener('click', e => {
       let end = new Date(`${day}T${s2}`).getTime();
       if (end <= start) end += DAY;
       if (end - start > 16*3600000) return toast('超过 16 小时，检查一下');
-      const sess = { id: uid(), taskId, todoId: $('#g-todo').value || null, start, end, manual: true };
-      S.sessions.push(sess);
-      closeSheet(); render(); toast(`已补记 ${fmtMin((end-start)/60000)}`);
-      api('/api/sessions', { method: 'POST', body: JSON.stringify(sess) })
-        .then(({data}) => { S.sessions = data.sessions; SREV = data.srev; render(); })
-        .catch(() => toast('补记没存到后台'));
+      const todoId = $('#g-todo').value || null;
+      const mins = fmtMin((end-start)/60000);
+      if (id){                                        // 改已有记录
+        const old = S.sessions.find(x => x.id === id);
+        if (old) Object.assign(old, { taskId, todoId, start, end, manual: true, auto: false, taskName: undefined });
+        closeSheet(); render(); toast(`已改成 ${mins}`);
+        api(`/api/sessions/${encodeURIComponent(id)}`,
+            { method: 'PUT', body: JSON.stringify({ taskId, todoId, start, end }) })
+          .then(({data}) => { S.sessions = data.sessions; SREV = data.srev; render(); })
+          .catch(() => toast('改动没存到后台'));
+      } else {
+        const sess = { id: uid(), taskId, todoId, start, end, manual: true };
+        S.sessions.push(sess);
+        closeSheet(); render(); toast(`已补记 ${mins}`);
+        api('/api/sessions', { method: 'POST', body: JSON.stringify(sess) })
+          .then(({data}) => { S.sessions = data.sessions; SREV = data.srev; render(); })
+          .catch(() => toast('补记没存到后台'));
+      }
       break; }
 
     case 'save-me': {
-      S.settings.examDate = $('#m-exam').value || S.settings.examDate;
-      S.settings.showCountdown = $('#m-cd').querySelector('[aria-pressed=true]').dataset.v === '1';
+      S.settings.examDate = $('#m-exam').value;
       S.settings.countdownText = $('#m-count-text').value.trim() || 'D-{days}';
-      S.settings.countdownSlogan = $('#m-count-slogan').value.trim();
+      S.settings.countdownColor = $('#m-count-color').value || '#E0562F';
+      S.settings.countdownTextColor = $('#m-count-text-color').value || '#2F7D9D';
+      delete S.settings.showCountdown;
+      delete S.settings.countdownSlogan;
+      delete S.settings.countdownSloganColor;
       S.settings.pomoMin = Math.max(1, +$('#m-pomo').value || 25);
       S.settings.autoStopHours = Math.max(0, Math.min(24, +$('#m-autostop').value || 0));
       save(); render(); toast('已保存'); break; }
@@ -1588,6 +1889,14 @@ document.addEventListener('click', e => {
       if (confirm('清空全部任务、待办和记录？')) { S = seed(); S.running = null; replaceAll('已清空'); }
       break;
   }
+});
+/* 饼图的两个日期框：改完直接重画，范围转成自定义 */
+document.addEventListener('change', e => {
+  if (!e.target.closest('[data-act="pie-range"]')) return;
+  pieFrom = $('#pie-from').value || null;
+  pieTo = $('#pie-to').value || null;
+  piePreset = (pieFrom || pieTo) ? 'custom' : 'day';
+  renderStat();
 });
 document.addEventListener('click', e => {
   const h = e.target.closest('[data-hook]'); if (!h) return;

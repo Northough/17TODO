@@ -44,12 +44,14 @@ CREATE TABLE IF NOT EXISTS todos (
 -- 专注片段。只由后端写入：计时落库、补记、自动结束。
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
-  task_id TEXT NOT NULL,
+  task_id TEXT,                        -- 可空：任务删了记录留着，名字存 task_name
   todo_id TEXT,
   start_ts INTEGER NOT NULL,
   end_ts INTEGER NOT NULL,
   manual INTEGER NOT NULL DEFAULT 0,   -- 手动补记
   auto INTEGER NOT NULL DEFAULT 0,     -- 超时兜底自动结束
+  task_name TEXT,                      -- 任务删了留下的名字快照：task_id 为空时才有值，
+                                       -- 之后建了同名任务会自动认领回去（见 db.py _claim_orphans）
   created_at INTEGER NOT NULL
 );
 

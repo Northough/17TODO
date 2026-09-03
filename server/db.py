@@ -727,14 +727,19 @@ class Store(object):
 
             todos = self.conn.execute('SELECT * FROM todos').fetchall()
             plan_rows = self._plan_rows(tm, todos)
-            # 周期自定待办只在 plans 段露面，不在 due / overdue 里重复一遍
-            in_plan = set(r['id'] for r in todos if r['plan_id'])
+            # 只有真在 plans 段露了面的才从 due / overdue 里摘掉。周期关了、或者是
+            # 上一轮剩下的，plans 段管不着，逾期没结算的照样得报出来。
+            in_plan = set(r['id'] for r in plan_rows if r['id'])
+            live_plans = set(r['id'] for r in
+                             self.conn.execute('SELECT id FROM periodic_plans'))
 
             due_today = []
             overdue = []
             for r in todos:
                 if r['done'] or r['id'] in in_plan:
                     continue
+                if r['plan_id'] and r['plan_id'] not in live_plans:
+                    continue        # 周期删了，它生出来的待办跟着一起不报
                 dd = self._todo_due_day(r)
                 item = {
                     'id': r['id'], 'title': r['title'],

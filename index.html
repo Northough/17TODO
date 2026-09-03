@@ -769,7 +769,9 @@ function todoSets(){
   const g = {};
   for (const td of S.todos){
     normalizeTodo(td);
-    if (td.planId) continue;
+    if (planGone(td)) continue;         // 周期删了，跟着一起不显示
+    if (td.planId && td.done) continue; // 周期待办做完并结算了，这一轮就翻篇，记录去「已结算」看
+    if (inPlanPanel(td)) continue;      // 上面那块已经在显示了，别重复
     let key;
     if (td.kind === 'loop') key = `loop:${td.cycleDays}`;
     else if (td.kind === 'dated' && isOverdue(td)) key = 'overdue';
@@ -787,6 +789,19 @@ function todoSets(){
 function planTodos(p){
   const start = planCycleStart(p);
   return S.todos.filter(td => td.planId === p.id && td.planStart === start).map(normalizeTodo);
+}
+
+/* 周期本身被删了，它生出来的待办跟着一起不显示。 */
+function planGone(td){ return !!td.planId && !planById(td.planId); }
+
+/* 「周期自定待办」那块只显示当前这一轮、而且周期还开着的。
+   周期关了、或者是上一轮没做完剩下的，那块不管，得放回普通待办里，
+   不然逾期没结算的会三个地方都不出现，等于凭空消失。 */
+function inPlanPanel(td){
+  if (!td.planId) return false;
+  const p = planById(td.planId);
+  if (!p || normalizePlan(p).active === false) return false;
+  return td.planStart === planCycleStart(p);
 }
 
 function renderPlanPanel(){
@@ -824,7 +839,8 @@ function focusDueSets(){
     const td = normalizeTodo(td0);
     if (td.planId) {
       const p = planById(td.planId);
-      if (!p || normalizePlan(p).active === false) continue;
+      if (!p) continue;                                                  // 周期删了，跟着一起不显示
+      if (normalizePlan(p).active === false && !isOverdue(td)) continue;  // 关了，还没逾期就不打扰
     }
     const due = todoDisplayDueTs(td);
     const key = due == null ? 'open' : String(due);
@@ -1720,13 +1736,15 @@ document.addEventListener('click', e => {
         const startDate = planCtx.start || planCycleStart(p);
         const dueDate = planDueDate(p, startDate);
         const payload = {
-          id: uid(), title, taskId, kind: 'dated', cycleDays: 0, onExpire: 'reset',
+          title, taskId, kind: 'dated', cycleDays: 0, onExpire: 'reset',
           cycleStart: undefined, startDate, startTime: '00:00', dueDate, dueTime: '23:59',
-          timeBase: fromDk(startDate), planId: p.id, planStart: startDate,
-          done: false, doneAt: null, order: S.todos.length
+          timeBase: fromDk(startDate), planId: p.id, planStart: startDate
         };
+        // id / done / order 只在新建时给。编辑时连 id 一起盖掉的话，
+        // sessions.todo_id 指的还是旧 id，那条待办上的专注记录就全悬空了。
         if (id) Object.assign(todoById(id), payload);
-        else S.todos.push(payload);
+        else S.todos.push(Object.assign({ id: uid(), done: false, doneAt: null,
+                                          order: S.todos.length }, payload));
       } else {
         const formKind = $('#d-kind').querySelector('[aria-pressed=true]').dataset.v;
         const cv = $('#d-cyc').querySelector('[aria-pressed=true]').dataset.v;
